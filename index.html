@@ -1,0 +1,3504 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>DegreePulse | העוזר האישי לתואר ולאימונים</title>
+  <!--
+    ====================================================================
+    מדריך מהיר לעריכת הקוד (עבורך!):
+    1. עיצוב וצבעים: נמצאים בתוך תגית <style> תחת :root (משתני CSS).
+    2. נתוני ברירת מחדל: נמצאים בתוך <script> בפונקציה getInitialData() - כרגע נקי וריק!
+    3. לוגיקה של דפים:
+       - renderDashboard() -> הדף הראשי והלו"ז היומי
+       - renderSchedule()  -> מערכת שעות וקורסים
+       - renderTasks()     -> עבודות, בחנים וקבצי Drive
+       - renderExams()     -> לוח מבחנים ומועדים
+       - renderTopics()    -> נושאים לחיזוק + חלון למידה (פלאשקארדס, שיעור, צ'אט)
+       - renderWorkouts()  -> מעקב אימונים מלא (תרגילים, סטים, משקלים, ריצה)
+    ====================================================================
+  -->
+  <style>
+    :root {
+      --bg-main: #0b1120;
+      --bg-card: rgba(30, 41, 59, 0.78);
+      --bg-card-solid: #1e293b;
+      --bg-elevated: #334155;
+      --bg-glass: rgba(15, 23, 42, 0.85);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: rgba(148, 163, 184, 0.16);
+      --accent-primary: #6366f1;
+      --accent-secondary: #06b6d4;
+      --accent-pink: #ec4899;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --gradient-brand: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+      --gradient-cyan: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+      --gradient-emerald: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      --shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.45);
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    [data-theme="light"] {
+      --bg-main: #f1f5f9;
+      --bg-card: rgba(255, 255, 255, 0.92);
+      --bg-card-solid: #ffffff;
+      --bg-elevated: #e2e8f0;
+      --bg-glass: rgba(255, 255, 255, 0.9);
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: rgba(15, 23, 42, 0.1);
+      --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-main);
+      background-image: 
+        radial-gradient(at 10% 10%, rgba(99, 102, 241, 0.16) 0px, transparent 50%),
+        radial-gradient(at 90% 20%, rgba(6, 182, 212, 0.14) 0px, transparent 50%),
+        radial-gradient(at 50% 90%, rgba(236, 72, 153, 0.12) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      overflow-x: hidden;
+      line-height: 1.5;
+    }
+
+    .app-shell {
+      display: flex;
+      width: 100%;
+      min-height: 100vh;
+    }
+
+    /* Sidebar Navigation (Desktop) */
+    .sidebar {
+      width: 270px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      border-left: 1px solid var(--border-color);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      z-index: 40;
+      flex-shrink: 0;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px 24px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 20px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: var(--gradient-brand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: var(--gradient-brand);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .nav-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.96rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: right;
+      font-family: inherit;
+    }
+
+    .nav-btn-inner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-btn:hover {
+      background: rgba(99, 102, 241, 0.08);
+      color: var(--text-main);
+    }
+
+    .nav-btn.active {
+      background: var(--gradient-brand);
+      color: #ffffff;
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+    }
+
+    .nav-badge {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.15);
+      color: inherit;
+      font-weight: 700;
+    }
+
+    .sidebar-footer {
+      border-top: 1px solid var(--border-color);
+      padding-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Main Content Area */
+    .main-area {
+      flex: 1;
+      padding: 28px 32px 100px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+      min-width: 0;
+    }
+
+    /* Top Header */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      padding: 18px 24px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .greeting-box h1 {
+      font-size: 1.55rem;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .greeting-box p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Buttons & Inputs */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 0.9rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--gradient-brand);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+
+    .btn-secondary {
+      background: var(--bg-elevated);
+      color: var(--text-main);
+      border-color: var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--accent-primary);
+    }
+
+    .btn-emerald {
+      background: var(--gradient-emerald);
+      color: #fff;
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border-color: rgba(244, 63, 94, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: var(--accent-rose);
+      color: #fff;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      border-radius: var(--radius-sm);
+    }
+
+    /* Quick Add Strip */
+    .quick-strip {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 24px;
+      scrollbar-width: thin;
+    }
+
+    .quick-chip {
+      flex-shrink: 0;
+      padding: 9px 15px;
+      border-radius: 99px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .quick-chip:hover {
+      border-color: var(--accent-primary);
+      background: rgba(99, 102, 241, 0.14);
+      transform: translateY(-1px);
+    }
+
+    /* Grid & Cards */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 22px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-top: 4px;
+    }
+
+    .stat-label {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 22px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Alert Banner */
+    .alerts-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .alert-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      background: rgba(15, 23, 42, 0.55);
+      border-right: 4px solid var(--accent-amber);
+      border: 1px solid var(--border-color);
+      border-right-width: 5px;
+      flex-wrap: wrap;
+    }
+
+    [data-theme="light"] .alert-item {
+      background: #f8fafc;
+    }
+
+    .alert-urgent {
+      border-right-color: var(--accent-rose);
+      background: rgba(244, 63, 94, 0.08);
+    }
+
+    .alert-soon {
+      border-right-color: var(--accent-amber);
+      background: rgba(245, 158, 11, 0.08);
+    }
+
+    /* Timeline Items */
+    .timeline-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .timeline-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      background: rgba(15, 23, 42, 0.45);
+      border: 1px solid var(--border-color);
+      transition: transform 0.15s ease;
+      flex-wrap: wrap;
+    }
+
+    [data-theme="light"] .timeline-item {
+      background: #f8fafc;
+    }
+
+    .timeline-item:hover {
+      transform: translateX(-3px);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .timeline-time {
+      font-weight: 800;
+      font-size: 0.92rem;
+      color: var(--accent-secondary);
+      min-width: 95px;
+      padding: 6px 10px;
+      background: rgba(6, 182, 212, 0.12);
+      border-radius: var(--radius-sm);
+      text-align: center;
+    }
+
+    /* Badges & Tags */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .badge-course {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .badge-urgent {
+      background: rgba(244, 63, 94, 0.2);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.35);
+    }
+
+    .badge-warning {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+
+    .badge-Workout {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+    }
+
+    /* Schedule Table */
+    .timetable-wrapper {
+      overflow-x: auto;
+    }
+
+    .timetable {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 720px;
+    }
+
+    .timetable th, .timetable td {
+      border: 1px solid var(--border-color);
+      padding: 12px 10px;
+      vertical-align: top;
+      width: 16.66%;
+    }
+
+    .timetable th {
+      background: rgba(99, 102, 241, 0.12);
+      font-weight: 700;
+      text-align: center;
+      font-size: 0.92rem;
+    }
+
+    .slot-card {
+      padding: 10px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      background: rgba(15, 23, 42, 0.65);
+      border-right: 4px solid var(--accent-primary);
+      font-size: 0.84rem;
+      position: relative;
+    }
+
+    [data-theme="light"] .slot-card {
+      background: #f1f5f9;
+    }
+
+    /* Difficult Topics Study Studio */
+    .studio-overlay {
+      background: var(--bg-card);
+      border: 2px solid var(--accent-primary);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+
+    .studio-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+      overflow-x: auto;
+    }
+
+    .studio-tab {
+      padding: 10px 18px;
+      border-radius: var(--radius-md);
+      background: var(--bg-elevated);
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-weight: 700;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .studio-tab.active {
+      background: var(--gradient-brand);
+      color: #fff;
+    }
+
+    /* Flashcard 3D */
+    .flashcard-stage {
+      perspective: 1000px;
+      max-width: 540px;
+      margin: 16px auto;
+    }
+
+    .flashcard-box {
+      width: 100%;
+      min-height: 230px;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(145deg, rgba(99, 102, 241, 0.22), rgba(15, 23, 42, 0.9));
+      border: 2px solid rgba(99, 102, 241, 0.45);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      box-shadow: var(--shadow-lg);
+      user-select: none;
+    }
+
+    [data-theme="light"] .flashcard-box {
+      background: linear-gradient(145deg, #eef2ff, #ffffff);
+    }
+
+    .flashcard-box:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 14px 34px rgba(99, 102, 241, 0.3);
+    }
+
+    .flashcard-box.flipped {
+      border-color: var(--accent-emerald);
+      background: linear-gradient(145deg, rgba(16, 185, 129, 0.2), rgba(15, 23, 42, 0.9));
+    }
+
+    [data-theme="light"] .flashcard-box.flipped {
+      background: linear-gradient(145deg, #ecfdf5, #ffffff);
+    }
+
+    /* Chat Window */
+    .chat-box {
+      display: flex;
+      flex-direction: column;
+      height: 400px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    [data-theme="light"] .chat-box {
+      background: #f8fafc;
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .chat-bubble {
+      max-width: 82%;
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .chat-bubble.user {
+      align-self: flex-start;
+      background: var(--gradient-brand);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .chat-bubble.ai {
+      align-self: flex-end;
+      background: var(--bg-elevated);
+      color: var(--text-main);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid var(--border-color);
+      background: var(--bg-card-solid);
+    }
+
+    /* Forms & Modals */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.75);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-card-solid);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: rgba(15, 23, 42, 0.55);
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.92rem;
+    }
+
+    [data-theme="light"] input,
+    [data-theme="light"] select,
+    [data-theme="light"] textarea {
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    /* Progress Bar */
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      background: rgba(148, 163, 184, 0.2);
+      border-radius: 99px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--gradient-brand);
+      border-radius: 99px;
+      transition: width 0.3s ease;
+    }
+
+    /* Subtasks & Attachments */
+    .subtask-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.35);
+      margin-bottom: 6px;
+      font-size: 0.86rem;
+    }
+
+    [data-theme="light"] .subtask-item {
+      background: #f1f5f9;
+    }
+
+    .subtask-item.done span {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+
+    .file-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 11px;
+      border-radius: 8px;
+      background: rgba(6, 182, 212, 0.14);
+      border: 1px solid rgba(6, 182, 212, 0.35);
+      color: #22d3ee;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+      margin-left: 6px;
+      margin-top: 6px;
+    }
+
+    [data-theme="light"] .file-pill {
+      color: #0284c7;
+    }
+
+    /* Mobile Bottom Navigation */
+    .mobile-nav {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      left: 0;
+      background: var(--bg-glass);
+      backdrop-filter: blur(18px);
+      border-top: 1px solid var(--border-color);
+      z-index: 60;
+      padding: 6px 8px;
+      justify-content: space-around;
+    }
+
+    .mobile-nav-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 6px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .mobile-nav-btn.active {
+      color: #818cf8;
+      background: rgba(99, 102, 241, 0.14);
+    }
+
+    .mobile-nav-btn span.icon {
+      font-size: 1.2rem;
+    }
+
+    /* ---------- רכיבי פריסה משותפים ---------- */
+    .item-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .timeline-main {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .timeline-text {
+      min-width: 0;
+    }
+
+    .date-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .date-row label, .date-row .btn, .nav-badge {
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .exercise-add-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr auto;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    /* טקסט ארוך (קישורים, מילים בלי רווחים) לא ישבור את הפריסה */
+    .main-area, .chat-bubble, .modal-content {
+      overflow-wrap: anywhere;
+    }
+
+    /* מניעת חריגה של גריד בחלונות צרים (לפני נקודת השבירה) */
+    .grid-2 { grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); }
+    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+
+    /* ---------- מחשב: מסכים רחבים במיוחד ---------- */
+    @media (min-width: 1600px) {
+      .main-area { max-width: 1600px; }
+    }
+
+    /* ---------- טאבלט / מחשב נייד קטן ---------- */
+    @media (max-width: 1100px) and (min-width: 901px) {
+      .sidebar { width: 230px; }
+      .main-area { padding: 24px 20px 80px; }
+    }
+
+    /* ---------- נייד וטאבלט ---------- */
+    @media (max-width: 900px) {
+      .sidebar {
+        display: none;
+      }
+      .mobile-nav {
+        display: flex;
+        padding-bottom: calc(6px + env(safe-area-inset-bottom));
+      }
+      .mobile-nav-btn {
+        flex: 1;
+        min-width: 0;
+        padding: 6px 2px;
+      }
+      .mobile-nav-btn span:not(.icon) {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .main-area {
+        padding: 16px 14px calc(96px + env(safe-area-inset-bottom));
+      }
+      .grid-2, .grid-3 {
+        grid-template-columns: 1fr;
+      }
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+      .stats-row {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+      .stat-card {
+        padding: 14px;
+      }
+      .stat-value {
+        font-size: 1.4rem;
+      }
+      .stat-icon {
+        width: 38px;
+        height: 38px;
+        font-size: 1.1rem;
+      }
+      .card {
+        padding: 16px;
+      }
+      .top-bar {
+        padding: 14px 16px;
+      }
+      .greeting-box h1 {
+        font-size: 1.2rem;
+      }
+      .top-actions, .date-row {
+        width: 100%;
+      }
+      .date-row input[type="date"] {
+        flex: 1;
+        min-width: 0;
+      }
+      .quick-strip {
+        scrollbar-width: none;
+        margin-inline: -14px;
+        padding-inline: 14px;
+      }
+      .quick-strip::-webkit-scrollbar {
+        display: none;
+      }
+      .top-actions > .btn {
+        width: 100%;
+      }
+
+      /* מניעת זום אוטומטי ב-iOS בלחיצה על שדה קלט */
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+
+      /* משטחי מגע נוחים */
+      .btn-sm {
+        min-height: 36px;
+      }
+
+      /* פריטי לו"ז והתראות: כפתורים בשורה נפרדת */
+      .timeline-item > .item-actions,
+      .alert-item > .btn {
+        width: 100%;
+        justify-content: flex-end;
+      }
+
+      /* מערכת שעות: במקום טבלה רחבה – רשימת ימים */
+      .timetable {
+        min-width: 0;
+      }
+      .timetable thead {
+        display: none;
+      }
+      .timetable, .timetable tbody, .timetable tr, .timetable td {
+        display: block;
+        width: 100%;
+      }
+      .timetable td {
+        border: none;
+        border-bottom: 1px solid var(--border-color);
+        padding: 12px 0;
+      }
+      .timetable td::before {
+        content: attr(data-day);
+        display: block;
+        font-weight: 800;
+        margin-bottom: 8px;
+        color: var(--text-main);
+      }
+
+      .exercise-add-row {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+      .exercise-add-row input:first-child,
+      .exercise-add-row .btn {
+        grid-column: 1 / -1;
+      }
+
+      .chat-box {
+        height: 60vh;
+        height: 60dvh;
+      }
+      .chat-bubble {
+        max-width: 92%;
+      }
+
+      .studio-overlay {
+        padding: 16px;
+      }
+      .studio-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .studio-tab {
+        padding: 10px 8px;
+        font-size: 0.85rem;
+      }
+      .flashcard-box {
+        min-height: 190px;
+        padding: 20px;
+      }
+
+      /* חלון קופץ כ"גיליון תחתון" בנייד */
+      .modal-backdrop {
+        align-items: flex-end;
+        padding: 0;
+      }
+      .modal-content {
+        max-width: 100%;
+        max-height: 92vh;
+        max-height: 92dvh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+      }
+    }
+
+    /* מסכי טלפון צרים מאוד */
+    @media (max-width: 380px) {
+      .mobile-nav-btn {
+        font-size: 0.62rem;
+      }
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* מכשירי מגע: בלי אפקטי ריחוף שנתקעים */
+    @media (hover: none) {
+      .timeline-item:hover,
+      .quick-chip:hover,
+      .btn-primary:hover,
+      .flashcard-box:hover {
+        transform: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand-logo">
+        <div class="brand-icon">🎓</div>
+        <div>
+          <div class="brand-title">DegreePulse</div>
+          <div class="brand-subtitle">עוזר אישי לתואר ואימונים</div>
+        </div>
+      </div>
+
+      <ul class="nav-list" id="desktop-nav">
+        <li>
+          <button class="nav-btn active" onclick="switchTab('dashboard')" data-tab="dashboard">
+            <span class="nav-btn-inner"><span>🏠</span> <span>דף ראשי ולו"ז יומי</span></span>
+            <span class="nav-badge" id="badge-dashboard">היום</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" onclick="switchTab('schedule')" data-tab="schedule">
+            <span class="nav-btn-inner"><span>📅</span> <span>מערכת שעות וקורסים</span></span>
+            <span class="nav-badge" id="badge-schedule">0</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" onclick="switchTab('tasks')" data-tab="tasks">
+            <span class="nav-btn-inner"><span>📂</span> <span>עבודות, בחנים וקבצים</span></span>
+            <span class="nav-badge" id="badge-tasks">0</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" onclick="switchTab('exams')" data-tab="exams">
+            <span class="nav-btn-inner"><span>🎯</span> <span>לוח מבחנים</span></span>
+            <span class="nav-badge" id="badge-exams">0</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" onclick="switchTab('topics')" data-tab="topics">
+            <span class="nav-btn-inner"><span>🧠</span> <span>נושאים לחיזוק (חדר למידה)</span></span>
+            <span class="nav-badge" id="badge-topics">0</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" onclick="switchTab('workouts')" data-tab="workouts">
+            <span class="nav-btn-inner"><span>💪</span> <span>מעקב אימונים מלא</span></span>
+            <span class="nav-badge" id="badge-workouts">0</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-btn" onclick="switchTab('cloud')" data-tab="cloud">
+            <span class="nav-btn-inner"><span>☁️</span> <span>נייד, Drive ועריכת קוד</span></span>
+          </button>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-secondary btn-sm" onclick="toggleTheme()" style="width:100%">
+          🌓 החלף ערכת נושא (כהה/בהיר)
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="exportBackup()" style="width:100%">
+          💾 גיבוי מהיר (ייצוא נתונים)
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-area">
+      <!-- Top Bar -->
+      <header class="top-bar">
+        <div class="greeting-box">
+          <h1 id="header-greeting">שלום! הנה תמונת המצב שלך להיום 🚀</h1>
+          <p id="header-date"></p>
+        </div>
+        <div class="top-actions">
+          <div class="date-row">
+            <label for="selected-date-picker" style="margin:0; font-size:0.82rem;">תאריך תצוגה:</label>
+            <input type="date" id="selected-date-picker" style="width:auto; padding:7px 10px;" onchange="onDateChange(this.value)" />
+            <button class="btn btn-secondary btn-sm" onclick="resetToToday()">היום</button>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openAiSettingsModal()">✨ הגדרות AI ו-Drive</button>
+        </div>
+      </header>
+
+      <!-- Quick Action Strip -->
+      <div class="quick-strip">
+        <button class="quick-chip" onclick="openCourseModal()">➕ הוסף קורס</button>
+        <button class="quick-chip" onclick="openScheduleModal()">➕ הוסף שיעור למערכת</button>
+        <button class="quick-chip" onclick="openTaskModal()">➕ הוסף עבודה / בוחן</button>
+        <button class="quick-chip" onclick="openExamModal()">➕ הוסף מבחן</button>
+        <button class="quick-chip" onclick="openTopicModal()">➕ הוסף נושא שאני מתקשה בו</button>
+        <button class="quick-chip" onclick="openWorkoutModal()">➕ תעד / שבץ אימון</button>
+      </div>
+
+      <!-- Dynamic Views Container -->
+      <div id="view-container"></div>
+    </main>
+
+    <!-- Mobile Bottom Bar -->
+    <nav class="mobile-nav" id="mobile-nav">
+      <button class="mobile-nav-btn active" onclick="switchTab('dashboard')" data-tab="dashboard">
+        <span class="icon">🏠</span><span>ראשי</span>
+      </button>
+      <button class="mobile-nav-btn" onclick="switchTab('schedule')" data-tab="schedule">
+        <span class="icon">📅</span><span>מערכת</span>
+      </button>
+      <button class="mobile-nav-btn" onclick="switchTab('tasks')" data-tab="tasks">
+        <span class="icon">📂</span><span>עבודות</span>
+      </button>
+      <button class="mobile-nav-btn" onclick="switchTab('exams')" data-tab="exams">
+        <span class="icon">🎯</span><span>מבחנים</span>
+      </button>
+      <button class="mobile-nav-btn" onclick="switchTab('topics')" data-tab="topics">
+        <span class="icon">🧠</span><span>למידה</span>
+      </button>
+      <button class="mobile-nav-btn" onclick="switchTab('workouts')" data-tab="workouts">
+        <span class="icon">💪</span><span>אימונים</span>
+      </button>
+      <button class="mobile-nav-btn" onclick="switchTab('cloud')" data-tab="cloud">
+        <span class="icon">☁️</span><span>ענן/קוד</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Universal Modal -->
+  <div class="modal-backdrop" id="modal-backdrop" onclick="if(event.target===this) closeModal()">
+    <div class="modal-content" id="modal-content"></div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. ניהול מצב ונתונים - התחלה נקייה לחלוטין (Clean Slate)
+    // =========================================================================
+    const STORAGE_KEY = 'degreepulse_clean_v1';
+    const DAYS_HEB = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+
+    function getTodayISO() {
+      const now = new Date();
+      const offset = now.getTimezoneOffset() * 60000;
+      return new Date(now - offset).toISOString().split('T')[0];
+    }
+
+    function addDaysISO(baseIso, days) {
+      const d = new Date(baseIso + 'T12:00:00');
+      d.setDate(d.getDate() + days);
+      return d.toISOString().split('T')[0];
+    }
+
+    let currentTab = 'dashboard';
+    let selectedDate = getTodayISO();
+    let activeStudioTopicId = null;
+    let activeStudioTab = 'flashcards';
+    let currentCardIndex = 0;
+    let isCardFlipped = false;
+    let pomodoroInterval = null;
+    let pomodoroSeconds = 25 * 60;
+    let pomodoroRunning = false;
+
+    function getInitialData() {
+      return {
+        settings: {
+          studentName: '',
+          semesterName: 'התואר שלי',
+          driveRootUrl: 'https://drive.google.com',
+          geminiApiKey: '',
+          theme: 'dark'
+        },
+        courses: [],
+        schedule: [],
+        tasks: [],
+        exams: [],
+        topics: [],
+        workouts: []
+      };
+    }
+
+    let state = loadState();
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          return sanitizeState(JSON.parse(raw));
+        }
+      } catch (e) {
+        console.error('Failed loading state:', e);
+      }
+      return getInitialData();
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        updateNavBadges();
+      } catch (e) {
+        console.error('Failed saving state:', e);
+      }
+    }
+
+    // =========================================================================
+    // 2. פונקציות עזר כלליות (Helpers)
+    // =========================================================================
+    function uid(prefix = 'id') {
+      return prefix + '_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36).slice(-3);
+    }
+
+    // --- אבטחה: מניעת הזרקת HTML/JS מטקסט שהמשתמש הזין, מגיבוי או מתשובת AI ---
+    // כל ערך שמגיע מהנתונים ומוצג בתוך תבנית HTML חייב לעבור דרך esc().
+    function esc(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // קישורים: רק http(s) או data: (קבצים מקומיים). כל השאר (למשל javascript:) נחסם.
+    function safeUrl(url) {
+      const u = String(url ?? '').trim();
+      return /^(https?:\/\/|data:)/i.test(u) ? esc(u) : '#';
+    }
+
+    // מזהים משמשים בתוך onclick, ולכן מותרים בהם רק אותיות, ספרות, _ ו- -
+    function safeId(value) {
+      return String(value ?? '').replace(/[^\w-]/g, '_');
+    }
+
+    function safeColor(value, fallback = '#6366f1') {
+      return /^#[0-9a-f]{3,8}$/i.test(String(value ?? '')) ? value : fallback;
+    }
+
+    // מנרמל נתונים מ-localStorage או מקובץ גיבוי: ממזג ברירות מחדל, מתקן מזהים וצבעים
+    function sanitizeState(raw) {
+      const base = getInitialData();
+      const src = raw && typeof raw === 'object' ? raw : {};
+      const fixList = (list, prefix, nestedKeys = []) =>
+        (Array.isArray(list) ? list : [])
+          .filter(x => x && typeof x === 'object')
+          .map(x => {
+            const item = { ...x, id: safeId(x.id) || uid(prefix) };
+            if ('courseId' in item) item.courseId = safeId(item.courseId) || 'general';
+            nestedKeys.forEach(k => { if (k in item) item[k] = fixList(item[k], k); });
+            return item;
+          });
+      const out = { ...base, ...src, settings: { ...base.settings, ...(src.settings || {}) } };
+      out.courses = fixList(src.courses, 'c').map(c => ({ ...c, color: safeColor(c.color) }));
+      out.schedule = fixList(src.schedule, 's');
+      out.tasks = fixList(src.tasks, 't', ['subtasks', 'files']);
+      out.exams = fixList(src.exams, 'e', ['syllabus', 'files']);
+      out.topics = fixList(src.topics, 'tp');
+      out.workouts = fixList(src.workouts, 'w');
+      out.settings.theme = out.settings.theme === 'light' ? 'light' : 'dark';
+      return out;
+    }
+
+    function getCourse(courseId) {
+      return state.courses.find(c => c.id === courseId) || { name: 'כללי', color: '#6366f1', driveUrl: '' };
+    }
+
+    function renderCourseOptions(selectedCourseId) {
+      const baseOption = `<option value="general" ${!selectedCourseId || selectedCourseId === 'general' ? 'selected' : ''}>כללי / ללא קורס ספציפי</option>`;
+      const courseOpts = state.courses.map(c => `<option value="${c.id}" ${c.id === selectedCourseId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+      return courseOpts ? courseOpts + baseOption : baseOption;
+    }
+
+    function daysBetween(dateIso1, dateIso2) {
+      const d1 = new Date(dateIso1 + 'T00:00:00');
+      const d2 = new Date(dateIso2 + 'T00:00:00');
+      return Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    }
+
+    function formatHebrewDate(isoStr) {
+      if (!isoStr) return '';
+      const d = new Date(isoStr + 'T12:00:00');
+      const dayName = DAYS_HEB[d.getDay()];
+      return `יום ${dayName}, ${d.toLocaleDateString('he-IL')}`;
+    }
+
+    function getUrgencyBadge(targetIso) {
+      const diff = daysBetween(getTodayISO(), targetIso);
+      if (diff < 0) return `<span class="badge badge-urgent">באיחור (${Math.abs(diff)} ימים)</span>`;
+      if (diff === 0) return `<span class="badge badge-urgent">🔥 היום!</span>`;
+      if (diff === 1) return `<span class="badge badge-urgent">⏰ מחר!</span>`;
+      if (diff <= 3) return `<span class="badge badge-urgent">בעוד ${diff} ימים</span>`;
+      if (diff <= 7) return `<span class="badge badge-warning">בעוד ${diff} ימים</span>`;
+      return `<span class="badge badge-success">בעוד ${diff} ימים</span>`;
+    }
+
+    function updateNavBadges() {
+      const pendingTasks = state.tasks.filter(t => t.status !== 'הוגש').length;
+      const upcomingExams = state.exams.filter(e => daysBetween(getTodayISO(), e.date) >= 0).length;
+      const activeTopics = state.topics.filter(tp => tp.status !== 'פוצח!').length;
+
+      document.getElementById('badge-schedule').textContent = state.courses.length + ' קורסים';
+      document.getElementById('badge-tasks').textContent = pendingTasks;
+      document.getElementById('badge-exams').textContent = upcomingExams;
+      document.getElementById('badge-topics').textContent = activeTopics;
+      document.getElementById('badge-workouts').textContent = state.workouts.length;
+    }
+
+    function toggleTheme() {
+      state.settings.theme = state.settings.theme === 'light' ? 'dark' : 'light';
+      applyTheme();
+      saveState();
+    }
+
+    function applyTheme() {
+      if (state.settings.theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+      renderCurrentView();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function onDateChange(val) {
+      if (!val) return;
+      selectedDate = val;
+      renderHeader();
+      if (currentTab === 'dashboard') renderCurrentView();
+    }
+
+    function resetToToday() {
+      selectedDate = getTodayISO();
+      document.getElementById('selected-date-picker').value = selectedDate;
+      renderHeader();
+      renderCurrentView();
+    }
+
+    function renderHeader() {
+      const isToday = selectedDate === getTodayISO();
+      document.getElementById('selected-date-picker').value = selectedDate;
+      document.getElementById('header-greeting').textContent = isToday
+        ? `שלום! הנה הלו"ז והיעדים שלך להיום 🚀`
+        : `תצוגת לו"ז עבור ${formatHebrewDate(selectedDate)} 📅`;
+      document.getElementById('header-date').textContent = `${formatHebrewDate(selectedDate)} • ${state.settings.semesterName}`;
+    }
+
+    // =========================================================================
+    // 3. רנדור תצוגות האתר (Views)
+    // =========================================================================
+    function renderCurrentView() {
+      renderHeader();
+      updateNavBadges();
+      const container = document.getElementById('view-container');
+      if (currentTab === 'dashboard') container.innerHTML = renderDashboard();
+      else if (currentTab === 'schedule') container.innerHTML = renderSchedule();
+      else if (currentTab === 'tasks') container.innerHTML = renderTasks();
+      else if (currentTab === 'exams') container.innerHTML = renderExams();
+      else if (currentTab === 'topics') container.innerHTML = renderTopics();
+      else if (currentTab === 'workouts') container.innerHTML = renderWorkouts();
+      else if (currentTab === 'cloud') container.innerHTML = renderCloudGuide();
+    }
+
+    // -------------------------------------------------------------------------
+    // 3.1 דף ראשי ולו"ז יומי (Dashboard)
+    // -------------------------------------------------------------------------
+    function renderDashboard() {
+      const targetDow = new Date(selectedDate + 'T12:00:00').getDay();
+
+      const dayLessons = state.schedule
+        .filter(s => Number(s.dayOfWeek) === targetDow)
+        .map(s => {
+          const c = getCourse(s.courseId);
+          return {
+            time: s.startTime,
+            endTime: s.endTime,
+            kind: 'שיעור במערכת',
+            icon: '🎓',
+            title: `${s.customCourseName || c.name} (${s.type})`,
+            subtitle: s.location || 'טרם הוגדר מיקום',
+            color: c.color,
+            actionHtml: `<button class="btn btn-secondary btn-sm" onclick="switchTab('schedule')">למערכת</button>`
+          };
+        });
+
+      const dayWorkouts = state.workouts
+        .filter(w => w.date === selectedDate)
+        .map(w => ({
+          time: w.time || '18:00',
+          endTime: `${w.durationMin || 60} דק׳`,
+          kind: w.completed ? 'אימון בוצע ✅' : 'אימון מתוכנן 💪',
+          icon: '🏋️',
+          title: w.title,
+          subtitle: `${w.category} • ${(w.exercises || []).length} תרגילים מתועדים`,
+          color: '#10b981',
+          actionHtml: `
+            <button class="btn ${w.completed ? 'btn-secondary' : 'btn-emerald'} btn-sm" onclick="toggleWorkoutDone('${w.id}')">
+              ${w.completed ? 'בוצע ✓' : 'סמן כבוצע'}
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('workouts')">פירוט</button>
+          `
+        }));
+
+      const dayTasks = state.tasks
+        .filter(t => t.dueDate === selectedDate)
+        .map(t => {
+          const c = getCourse(t.courseId);
+          return {
+            time: t.dueTime || '23:59',
+            endTime: t.type,
+            kind: `${t.type} להגשה היום!`,
+            icon: t.type === 'בוחן' ? '⚡' : '📝',
+            title: t.title,
+            subtitle: `${c.name} • סטטוס: ${t.status}`,
+            color: '#f43f5e',
+            actionHtml: `<button class="btn btn-primary btn-sm" onclick="switchTab('tasks')">פתח ${esc(t.type)}</button>`
+          };
+        });
+
+      const dayExams = state.exams
+        .filter(e => e.date === selectedDate)
+        .map(e => {
+          const c = getCourse(e.courseId);
+          return {
+            time: e.time || '09:00',
+            endTime: e.term,
+            kind: 'מבחן היום! 🎯',
+            icon: '🚨',
+            title: `${e.title} (${c.name})`,
+            subtitle: e.location || 'בדוק מיקום כיתה',
+            color: '#f43f5e',
+            actionHtml: `<button class="btn btn-primary btn-sm" onclick="switchTab('exams')">למבחן</button>`
+          };
+        });
+
+      const unifiedTimeline = [...dayLessons, ...dayWorkouts, ...dayTasks, ...dayExams]
+        .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
+
+      const upcomingAlerts = [];
+      state.exams.forEach(e => {
+        const diff = daysBetween(getTodayISO(), e.date);
+        if (diff >= 0 && diff <= 21) {
+          const c = getCourse(e.courseId);
+          const doneSy = (e.syllabus || []).filter(s => s.done).length;
+          const totalSy = (e.syllabus || []).length;
+          upcomingAlerts.push({
+            diff,
+            urgent: diff <= 5,
+            type: 'מבחן קרוב 🎯',
+            title: `${e.title} - ${c.name}`,
+            meta: `${formatHebrewDate(e.date)} בשעה ${e.time} • מוכנות סילבוס: ${doneSy}/${totalSy}`,
+            badge: getUrgencyBadge(e.date),
+            tab: 'exams'
+          });
+        }
+      });
+
+      state.tasks.filter(t => t.status !== 'הוגש').forEach(t => {
+        const diff = daysBetween(getTodayISO(), t.dueDate);
+        if (diff <= 10) {
+          const c = getCourse(t.courseId);
+          const doneSub = (t.subtasks || []).filter(s => s.done).length;
+          const totalSub = (t.subtasks || []).length;
+          upcomingAlerts.push({
+            diff,
+            urgent: diff <= 2,
+            type: `${t.type} להגשה 📂`,
+            title: `${t.title} (${c.name})`,
+            meta: `מועד הגשה: ${formatHebrewDate(t.dueDate)} עד ${t.dueTime || '23:59'} • שלבים: ${doneSub}/${totalSub}`,
+            badge: getUrgencyBadge(t.dueDate),
+            tab: 'tasks'
+          });
+        }
+      });
+
+      upcomingAlerts.sort((a, b) => a.diff - b.diff);
+
+      const openTasksCount = state.tasks.filter(t => t.status !== 'הוגש').length;
+      const upcomingExamsCount = state.exams.filter(e => daysBetween(getTodayISO(), e.date) >= 0).length;
+      const hardTopicsCount = state.topics.filter(tp => tp.status !== 'פוצח!').length;
+      const completedWorkoutsCount = state.workouts.filter(w => w.completed).length;
+
+      return `
+        <!-- כרטיסי סטטיסטיקה -->
+        <div class="stats-row">
+          <div class="stat-card" onclick="switchTab('tasks')" style="cursor:pointer">
+            <div>
+              <div class="stat-label">עבודות ובחנים פתוחים</div>
+              <div class="stat-value">${openTasksCount}</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(99,102,241,0.18); color:#818cf8;">📂</div>
+          </div>
+          <div class="stat-card" onclick="switchTab('exams')" style="cursor:pointer">
+            <div>
+              <div class="stat-label">מבחנים קרובים</div>
+              <div class="stat-value">${upcomingExamsCount}</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(244,63,94,0.18); color:#fb7185;">🎯</div>
+          </div>
+          <div class="stat-card" onclick="switchTab('topics')" style="cursor:pointer">
+            <div>
+              <div class="stat-label">נושאים לחיזוק</div>
+              <div class="stat-value">${hardTopicsCount}</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(6,182,212,0.18); color:#22d3ee;">🧠</div>
+          </div>
+          <div class="stat-card" onclick="switchTab('workouts')" style="cursor:pointer">
+            <div>
+              <div class="stat-label">אימונים שהושלמו</div>
+              <div class="stat-value">${completedWorkoutsCount}/${state.workouts.length}</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(16,185,129,0.18); color:#34d399;">💪</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- הלו"ז היומי המשולב -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <span>⏱️</span>
+                <span>הלו"ז היומי שלי (${selectedDate === getTodayISO() ? 'היום' : formatHebrewDate(selectedDate)})</span>
+              </div>
+              <div class="item-actions">
+                <button class="btn btn-secondary btn-sm" onclick="openScheduleModal()">+ שיעור</button>
+                <button class="btn btn-emerald btn-sm" onclick="openWorkoutModal()">+ אימון</button>
+              </div>
+            </div>
+
+            ${unifiedTimeline.length === 0 ? `
+              <div style="text-align:center; padding:32px 16px; color:var(--text-muted);">
+                <div style="font-size:2.2rem; margin-bottom:8px;">✨</div>
+                <p>הלו"ז היומי שלך מוכן להזנה! הוסף קורסים, שיעורים, אימונים או בחנים כדי לראות אותם כאן.</p>
+                <div style="margin-top:14px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                  <button class="btn btn-primary btn-sm" onclick="openCourseModal()">+ הוסף קורס ראשון</button>
+                  <button class="btn btn-secondary btn-sm" onclick="openScheduleModal()">+ הוסף שיעור למערכת</button>
+                  <button class="btn btn-emerald btn-sm" onclick="openWorkoutModal()">+ שבץ אימון</button>
+                </div>
+              </div>
+            ` : `
+              <div class="timeline-list">
+                ${unifiedTimeline.map(item => `
+                  <div class="timeline-item" style="border-right: 4px solid ${safeColor(item.color)};">
+                    <div class="timeline-main">
+                      <div class="timeline-time">
+                        <div>${esc(item.time)}</div>
+                        <div style="font-size:0.73rem; color:var(--text-muted); font-weight:500;">${esc(item.endTime)}</div>
+                      </div>
+                      <div class="timeline-text">
+                        <div style="font-size:0.76rem; color:var(--text-muted); font-weight:700;">${item.icon} ${esc(item.kind)}</div>
+                        <div style="font-weight:700; font-size:1rem; margin:2px 0;">${esc(item.title)}</div>
+                        <div style="font-size:0.84rem; color:var(--text-muted);">${esc(item.subtitle)}</div>
+                      </div>
+                    </div>
+                    <div class="item-actions">
+                      ${item.actionHtml}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+
+          <!-- מרכז התראות על מבחנים ועבודות קרובים -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <span>🔔</span>
+                <span>התראות: מבחנים, בחנים ועבודות קרובות</span>
+              </div>
+              <div class="item-actions">
+                <button class="btn btn-primary btn-sm" onclick="openTaskModal()">+ עבודה/בוחן</button>
+                <button class="btn btn-secondary btn-sm" onclick="openExamModal()">+ מבחן</button>
+              </div>
+            </div>
+
+            ${upcomingAlerts.length === 0 ? `
+              <div style="text-align:center; padding:32px 16px; color:var(--text-muted);">
+                <div style="font-size:2.2rem; margin-bottom:8px;">🔔</div>
+                <p>ברגע שתוסיף עבודות, בחנים או מבחנים קרובים, ההתראות הדחופות יופיעו כאן אוטומטית.</p>
+              </div>
+            ` : `
+              <div class="alerts-container">
+                ${upcomingAlerts.map(al => `
+                  <div class="alert-item ${al.urgent ? 'alert-urgent' : 'alert-soon'}">
+                    <div>
+                      <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                        <span style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">${esc(al.type)}</span>
+                        ${al.badge}
+                      </div>
+                      <div style="font-weight:700; font-size:0.98rem;">${esc(al.title)}</div>
+                      <div style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">${esc(al.meta)}</div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="switchTab('${al.tab}')">טפל בזה ←</button>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+
+        <!-- גישה מהירה לנושאים שאני מתקשה בהם -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span>🧠</span>
+              <span>נושאים לחיזוק שמחכים לך בחדר הלמידה</span>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openTopicModal()">+ הוסף נושא שאני מתקשה בו</button>
+          </div>
+          ${state.topics.length === 0 ? `
+            <div style="text-align:center; padding:24px; color:var(--text-muted);">
+              <p>עדיין לא הוספת נושאים לחיזוק. לחץ על <strong>"+ הוסף נושא שאני מתקשה בו"</strong> כדי לייצר חדר למידה עם פלאשקארדס, שיעור מובנה וצ'אט.</p>
+            </div>
+          ` : `
+            <div class="grid-3">
+              ${state.topics.map(tp => {
+                const c = getCourse(tp.courseId);
+                return `
+                  <div class="timeline-item" style="flex-direction:column; align-items:stretch; border-top:4px solid ${c.color}; cursor:pointer;" onclick="openTopicStudio('${tp.id}')">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <span class="badge badge-course" style="background:${c.color}">${esc(c.name)}</span>
+                      <span class="badge ${tp.status === 'פוצח!' ? 'badge-success' : 'badge-warning'}">${esc(tp.status)}</span>
+                    </div>
+                    <div style="font-weight:800; font-size:1.05rem; margin-top:6px;">${esc(tp.title)}</div>
+                    <div style="font-size:0.84rem; color:var(--text-muted); flex:1;">${esc(tp.struggleNotes || 'לחץ לפתיחת חדר למידה אינטראקטיבי')}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color); font-size:0.8rem;">
+                      <span>🃏 ${(tp.flashcards || []).length} כרטיסיות • 📖 שיעור • 💬 צ'אט</span>
+                      <span style="color:#818cf8; font-weight:700;">כנס לחדר למידה ←</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3.2 מערכת שעות וקורסים (Schedule & Courses)
+    // -------------------------------------------------------------------------
+    function renderSchedule() {
+      return `
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🎓 הקורסים שלי הסמסטר (כולל קישור לתיקיית Google Drive לכל קורס)</div>
+            <button class="btn btn-primary btn-sm" onclick="openCourseModal()">+ הוסף קורס חדש</button>
+          </div>
+          ${state.courses.length === 0 ? `
+            <div style="text-align:center; padding:28px; color:var(--text-muted);">
+              <p>עדיין לא הוספת קורסים. הוסף את הקורסים שלך כדי לשייך אליהם שיעורים, עבודות ומבחנים!</p>
+              <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="openCourseModal()">+ הוסף קורס ראשון</button>
+            </div>
+          ` : `
+            <div class="grid-3">
+              ${state.courses.map(c => `
+                <div class="timeline-item" style="border-right: 5px solid ${c.color}; flex-direction:column; align-items:stretch;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                      <div style="font-weight:800; font-size:1.05rem;">${esc(c.name)}</div>
+                      <div style="font-size:0.84rem; color:var(--text-muted);">מרצה: ${esc(c.lecturer || 'לא הוזן')} • ${esc(c.credits || 0)} נ"ז</div>
+                    </div>
+                    <div class="item-actions">
+                      <button class="btn btn-secondary btn-sm" onclick="openCourseModal('${c.id}')">✏️</button>
+                      <button class="btn btn-danger btn-sm" onclick="deleteCourse('${c.id}')">🗑️</button>
+                    </div>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid var(--border-color);">
+                    ${c.driveUrl ? `<a href="${safeUrl(c.driveUrl)}" target="_blank" rel="noopener" class="file-pill">📁 תיקיית Drive של הקורס ↗</a>` : `<span style="font-size:0.8rem; color:var(--text-muted);">אין קישור ל-Drive</span>`}
+                    <button class="btn btn-secondary btn-sm" onclick="openScheduleModal(null, '${c.id}')">+ הוסף שעה</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📅 מערכת שעות שבועית (ימים א׳ - ו׳)</div>
+            <button class="btn btn-primary btn-sm" onclick="openScheduleModal()">+ הוסף שיעור / תרגול למערכת</button>
+          </div>
+          <div class="timetable-wrapper">
+            <table class="timetable">
+              <thead>
+                <tr>
+                  ${[0,1,2,3,4,5].map(d => `<th>יום ${DAYS_HEB[d]}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  ${[0,1,2,3,4,5].map(d => {
+                    const slots = state.schedule
+                      .filter(s => Number(s.dayOfWeek) === d)
+                      .sort((a,b) => a.startTime.localeCompare(b.startTime));
+                    return `
+                      <td data-day="יום ${DAYS_HEB[d]}">
+                        ${slots.length === 0 ? `<div style="text-align:center; color:var(--text-muted); font-size:0.8rem; padding:18px 0;">חופשי</div>` : ''}
+                        ${slots.map(s => {
+                          const c = getCourse(s.courseId);
+                          return `
+                            <div class="slot-card" style="border-right-color:${c.color}">
+                              <div style="font-weight:800; color:${c.color}; font-size:0.78rem;">${esc(s.startTime)} - ${esc(s.endTime)}</div>
+                              <div style="font-weight:700; margin:3px 0;">${esc(s.customCourseName || c.name)}</div>
+                              <div style="font-size:0.78rem; color:var(--text-muted);">${esc(s.type)} • ${esc(s.location || '')}</div>
+                              <div style="display:flex; gap:6px; margin-top:8px;">
+                                <button class="btn btn-secondary btn-sm" style="padding:2px 7px; font-size:0.72rem;" onclick="openScheduleModal('${s.id}')">ערוך</button>
+                                <button class="btn btn-danger btn-sm" style="padding:2px 7px; font-size:0.72rem;" onclick="deleteScheduleSlot('${s.id}')">מחק</button>
+                              </div>
+                            </div>
+                          `;
+                        }).join('')}
+                      </td>
+                    `;
+                  }).join('')}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3.3 עבודות, בחנים, צ'קליסט ארגון וקבצי Google Drive (Tasks)
+    // -------------------------------------------------------------------------
+    function renderTasks() {
+      const sortedTasks = [...state.tasks].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+      return `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">📂 ארגון עבודות, בחנים וקבצים מצורפים</div>
+              <p style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">
+                כאן תוכל לפרק כל עבודה לתתי-משימות, לעקוב אחרי סטטוס ההגשה ולצרף קישורים לתיקיות/קבצים ב-Google Drive או קבצים מקומיים.
+              </p>
+            </div>
+            <button class="btn btn-primary" onclick="openTaskModal()">➕ הוסף עבודה או בוחן</button>
+          </div>
+
+          ${sortedTasks.length === 0 ? `
+            <div style="text-align:center; padding:40px;">
+              <p style="color:var(--text-muted);">עדיין לא הוזנו עבודות או בחנים.</p>
+              <button class="btn btn-primary" style="margin-top:12px;" onclick="openTaskModal()">+ הוסף עבודה או בוחן ראשון</button>
+            </div>
+          ` : `
+            <div class="grid-2">
+              ${sortedTasks.map(t => {
+                const c = getCourse(t.courseId);
+                const subtasks = t.subtasks || [];
+                const doneCount = subtasks.filter(s => s.done).length;
+                const pct = subtasks.length ? Math.round((doneCount / subtasks.length) * 100) : (t.status === 'הוגש' ? 100 : 0);
+
+                return `
+                  <div class="card" style="margin-bottom:0; border-top:4px solid ${c.color}; background:rgba(15,23,42,0.4);">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px;">
+                      <div>
+                        <span class="badge badge-course" style="background:${c.color}">${esc(c.name)}</span>
+                        <span class="badge" style="background:rgba(255,255,255,0.1);">${esc(t.type)}</span>
+                        ${t.status === 'הוגש' ? `<span class="badge badge-success">✅ הוגש</span>` : getUrgencyBadge(t.dueDate)}
+                      </div>
+                      <div class="item-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="openTaskModal('${t.id}')">✏️ ערוך</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">🗑️</button>
+                      </div>
+                    </div>
+
+                    <h3 style="font-size:1.15rem; margin-bottom:4px;">${esc(t.title)}</h3>
+                    <div style="font-size:0.84rem; color:var(--text-muted); margin-bottom:10px;">
+                      📅 הגשה: ${formatHebrewDate(t.dueDate)} בשעה ${esc(t.dueTime || '23:59')} • עדיפות: ${esc(t.priority)}
+                    </div>
+                    ${t.notes ? `<div style="font-size:0.86rem; padding:8px 12px; background:rgba(255,255,255,0.04); border-radius:8px; margin-bottom:12px; white-space:pre-wrap;">💡 ${esc(t.notes)}</div>` : ''}
+
+                    <div style="margin-bottom:14px;">
+                      <div style="display:flex; justify-content:space-between; font-size:0.82rem; font-weight:700; margin-bottom:4px;">
+                        <span>📋 שלבי ביצוע לעבודה (${doneCount}/${subtasks.length})</span>
+                        <span>${pct}%</span>
+                      </div>
+                      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+                      <div style="margin-top:8px;">
+                        ${subtasks.map(st => `
+                          <div class="subtask-item ${st.done ? 'done' : ''}">
+                            <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; color:var(--text-main); flex:1;">
+                              <input type="checkbox" style="width:16px; height:16px;" ${st.done ? 'checked' : ''} onchange="toggleSubtask('${t.id}', '${st.id}')" />
+                              <span>${esc(st.text)}</span>
+                            </label>
+                            <button class="btn btn-danger btn-sm" style="padding:2px 6px; font-size:0.7rem;" onclick="removeSubtask('${t.id}', '${st.id}')">✕</button>
+                          </div>
+                        `).join('')}
+                      </div>
+                      <div style="display:flex; gap:6px; margin-top:8px;">
+                        <input type="text" id="new-subtask-${t.id}" placeholder="הוסף תת-משימה לארגון העבודה..." style="padding:6px 10px; font-size:0.83rem;" onkeydown="if(event.key==='Enter') addSubtask('${t.id}')" />
+                        <button class="btn btn-secondary btn-sm" onclick="addSubtask('${t.id}')">+ שלב</button>
+                      </div>
+                    </div>
+
+                    <div style="border-top:1px solid var(--border-color); padding-top:12px;">
+                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="font-size:0.82rem; font-weight:700;">📎 קבצים מצורפים וקישורי Drive:</span>
+                        <button class="btn btn-secondary btn-sm" onclick="openAttachmentModal('task', '${t.id}')">+ צרף קובץ / קישור Drive</button>
+                      </div>
+                      <div>
+                        ${(t.files || []).length === 0 ? `<span style="font-size:0.8rem; color:var(--text-muted);">אין קבצים מצורפים עדיין.</span>` : ''}
+                        ${(t.files || []).map(f => `
+                          <span class="file-pill">
+                            <a href="${safeUrl(f.url)}" target="_blank" rel="noopener" ${f.type === 'local' ? `download="${esc(f.fileName || f.name)}"` : ''} style="color:inherit; text-decoration:none;">
+                              ${f.type === 'local' ? '📄' : '☁️'} ${esc(f.name)} ↗
+                            </a>
+                            <span style="cursor:pointer; margin-right:4px; color:#fb7185;" onclick="removeAttachment('task', '${t.id}', '${f.id}')">✕</span>
+                          </span>
+                        `).join('')}
+                      </div>
+                    </div>
+
+                    <div style="margin-top:14px; display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:10px;">
+                      <span style="font-size:0.8rem; color:var(--text-muted);">סטטוס נוכחי: <strong>${esc(t.status)}</strong></span>
+                      <button class="btn ${t.status === 'הוגש' ? 'btn-secondary' : 'btn-emerald'} btn-sm" onclick="toggleTaskCompleted('${t.id}')">
+                        ${t.status === 'הוגש' ? 'החזר ל"בתהליך"' : 'סמן כ"הוגש" ✅'}
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3.4 לוח מבחנים (Exams)
+    // -------------------------------------------------------------------------
+    function renderExams() {
+      const sortedExams = [...state.exams].sort((a, b) => a.date.localeCompare(b.date));
+      return `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🎯 לוח מבחנים, מועדים וצ'קליסט חומר לימוד</div>
+              <p style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">
+                עקוב אחר ספירה לאחור לכל מבחן, סמן נושאים שעברת עליהם וצרף מבחני עבר מ-Google Drive.
+              </p>
+            </div>
+            <button class="btn btn-primary" onclick="openExamModal()">➕ הוסף מבחן חדש</button>
+          </div>
+
+          ${sortedExams.length === 0 ? `
+            <div style="text-align:center; padding:40px; color:var(--text-muted);">
+              <p>עדיין לא הוזנו מבחנים בלוח.</p>
+              <button class="btn btn-primary" style="margin-top:12px;" onclick="openExamModal()">+ הוסף מבחן ראשון</button>
+            </div>
+          ` : `
+            <div class="grid-2">
+              ${sortedExams.map(e => {
+                const c = getCourse(e.courseId);
+                const syl = e.syllabus || [];
+                const doneSyl = syl.filter(s => s.done).length;
+                const pct = syl.length ? Math.round((doneSyl / syl.length) * 100) : 0;
+
+                return `
+                  <div class="card" style="margin-bottom:0; border-top:4px solid ${c.color}; background:rgba(15,23,42,0.4);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                      <div>
+                        <span class="badge badge-course" style="background:${c.color}">${esc(c.name)}</span>
+                        <span class="badge" style="background:rgba(255,255,255,0.1);">${esc(e.term)}</span>
+                        ${getUrgencyBadge(e.date)}
+                      </div>
+                      <div class="item-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="openExamModal('${e.id}')">✏️</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteExam('${e.id}')">🗑️</button>
+                      </div>
+                    </div>
+
+                    <h3 style="font-size:1.15rem; margin-bottom:4px;">${esc(e.title)}</h3>
+                    <div style="font-size:0.86rem; color:var(--text-muted); margin-bottom:12px;">
+                      📅 ${formatHebrewDate(e.date)} • ⏰ שעה ${esc(e.time)} • 📍 ${esc(e.location || 'טרם פורסם חדר')}
+                    </div>
+
+                    <div style="margin-bottom:12px;">
+                      <div style="display:flex; justify-content:space-between; font-size:0.82rem; font-weight:700;">
+                        <span>📚 מוכנות בחומר המבחן (${doneSyl}/${syl.length})</span>
+                        <span>${pct}%</span>
+                      </div>
+                      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+                      <div style="margin-top:8px;">
+                        ${syl.map(s => `
+                          <div class="subtask-item ${s.done ? 'done' : ''}">
+                            <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; color:var(--text-main); flex:1;">
+                              <input type="checkbox" style="width:16px; height:16px;" ${s.done ? 'checked' : ''} onchange="toggleExamSyllabus('${e.id}', '${s.id}')" />
+                              <span>${esc(s.text)}</span>
+                            </label>
+                            <button class="btn btn-danger btn-sm" style="padding:2px 6px; font-size:0.7rem;" onclick="removeExamSyllabus('${e.id}', '${s.id}')">✕</button>
+                          </div>
+                        `).join('')}
+                      </div>
+                      <div style="display:flex; gap:6px; margin-top:8px;">
+                        <input type="text" id="new-syl-${e.id}" placeholder="הוסף נושא לתרגול לקראת המבחן..." style="padding:6px 10px; font-size:0.83rem;" onkeydown="if(event.key==='Enter') addExamSyllabus('${e.id}')" />
+                        <button class="btn btn-secondary btn-sm" onclick="addExamSyllabus('${e.id}')">+ נושא</button>
+                      </div>
+                    </div>
+
+                    <div style="border-top:1px solid var(--border-color); padding-top:10px;">
+                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="font-size:0.82rem; font-weight:700;">📎 מבחני עבר ודפי נוסחאות (Drive):</span>
+                        <button class="btn btn-secondary btn-sm" onclick="openAttachmentModal('exam', '${e.id}')">+ צרף קובץ / Drive</button>
+                      </div>
+                      <div>
+                        ${(e.files || []).map(f => `
+                          <span class="file-pill">
+                            <a href="${safeUrl(f.url)}" target="_blank" rel="noopener" ${f.type === 'local' ? `download="${esc(f.fileName || f.name)}"` : ''} style="color:inherit; text-decoration:none;">${f.type === 'local' ? '📄' : '☁️'} ${esc(f.name)} ↗</a>
+                            <span style="cursor:pointer; margin-right:4px; color:#fb7185;" onclick="removeAttachment('exam', '${e.id}', '${f.id}')">✕</span>
+                          </span>
+                        `).join('')}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3.5 נושאים לחיזוק + חלון למידה ייעודי (Difficult Topics & Study Studio)
+    // -------------------------------------------------------------------------
+    function renderTopics() {
+      const studioTopic = state.topics.find(tp => tp.id === activeStudioTopicId);
+
+      return `
+        ${studioTopic ? renderTopicStudioWindow(studioTopic) : ''}
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🧠 נושאים שאני מתקשה בהם – רשימת הנושאים וחדר הלמידה</div>
+              <p style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">
+                רשום כל נושא שמאתגר אותך. לחיצה על נושא פותחת את <strong>חלון הלמידה האישי</strong> שלו עם פלאשקארדס, מערך שיעור מובנה, צ'אט למידה איתי ובוחן עצמי.
+              </p>
+            </div>
+            <button class="btn btn-primary" onclick="openTopicModal()">➕ הוסף נושא שאני מתקשה בו</button>
+          </div>
+
+          ${state.topics.length === 0 ? `
+            <div style="text-align:center; padding:40px; color:var(--text-muted);">
+              <p>עדיין לא הוספת נושאים לחיזוק. לחץ על הכפתור למטה כדי להוסיף נושא ראשון ולייצר עבורו חדר למידה!</p>
+              <button class="btn btn-primary" style="margin-top:12px;" onclick="openTopicModal()">+ הוסף נושא ראשון</button>
+            </div>
+          ` : `
+            <div class="grid-3">
+              ${state.topics.map(tp => {
+                const c = getCourse(tp.courseId);
+                const isSelected = tp.id === activeStudioTopicId;
+                return `
+                  <div class="card" style="margin-bottom:0; border:2px solid ${isSelected ? '#6366f1' : 'var(--border-color)'}; border-top:5px solid ${c.color}; cursor:pointer;" onclick="openTopicStudio('${tp.id}')">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                      <span class="badge badge-course" style="background:${c.color}">${esc(c.name)}</span>
+                      <span class="badge ${tp.status === 'פוצח!' ? 'badge-success' : 'badge-warning'}">${esc(tp.status)} • קושי ${esc(tp.difficulty)}/5</span>
+                    </div>
+                    <h3 style="font-size:1.12rem; margin-bottom:6px;">${esc(tp.title)}</h3>
+                    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:14px;">
+                      ${esc(tp.struggleNotes || 'לחץ כדי להיכנס לחדר הלמידה על הנושא')}
+                    </p>
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:10px;">
+                      <div class="item-actions" onclick="event.stopPropagation()">
+                        <button class="btn btn-secondary btn-sm" onclick="openTopicModal('${tp.id}')">✏️</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteTopic('${tp.id}')">🗑️</button>
+                      </div>
+                      <button class="btn btn-primary btn-sm">🚀 פתח חלון למידה</button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function renderTopicStudioWindow(tp) {
+      const c = getCourse(tp.courseId);
+      const cards = tp.flashcards || [];
+      const currentCard = cards[currentCardIndex] || { q: 'אין כרטיסיות עדיין', a: 'לחץ על "+ הוסף כרטיסייה" או "ייצר אוטומטית עם AI"' };
+      const mins = String(Math.floor(pomodoroSeconds / 60)).padStart(2, '0');
+      const secs = String(pomodoroSeconds % 60).padStart(2, '0');
+
+      let studioBodyHtml = '';
+
+      if (activeStudioTab === 'flashcards') {
+        studioBodyHtml = `
+          <div style="text-align:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+              <span style="font-size:0.9rem; color:var(--text-muted);">כרטיסייה ${cards.length ? currentCardIndex + 1 : 0} מתוך ${cards.length} (לחץ על הכרטיסייה כדי להפוך)</span>
+              <div class="item-actions">
+                <button class="btn btn-secondary btn-sm" onclick="openAddFlashcardModal('${tp.id}')">+ הוסף כרטיסייה ידנית</button>
+                <button class="btn btn-primary btn-sm" onclick="generateAiContentForTopic('${tp.id}')">✨ ייצר עוד פלאשקארדס ושיעור (AI)</button>
+              </div>
+            </div>
+
+            <div class="flashcard-stage">
+              <div class="flashcard-box ${isCardFlipped ? 'flipped' : ''}" onclick="flipFlashcard()">
+                <div style="font-size:0.78rem; font-weight:700; text-transform:uppercase; color:var(--accent-secondary); margin-bottom:10px;">
+                  ${isCardFlipped ? '💡 תשובה והסבר' : '❓ שאלה / מושג (לחץ להיפוך)'}
+                </div>
+                <div style="font-size:1.2rem; font-weight:700; line-height:1.5; white-space:pre-wrap;">
+                  ${esc(isCardFlipped ? currentCard.a : currentCard.q)}
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:center; gap:12px; margin-top:16px; flex-wrap:wrap;">
+              <button class="btn btn-secondary" onclick="prevFlashcard(${cards.length})">➡️ הקודם</button>
+              <button class="btn btn-secondary" onclick="flipFlashcard()">🔄 הפוך כרטיסייה</button>
+              <button class="btn btn-secondary" onclick="nextFlashcard(${cards.length})">הבא ⬅️</button>
+              ${cards.length > 0 ? `<button class="btn btn-danger btn-sm" onclick="deleteCurrentFlashcard('${tp.id}')">🗑️ מחק כרטיסייה</button>` : ''}
+            </div>
+          </div>
+        `;
+      } else if (activeStudioTab === 'lesson') {
+        const lesson = tp.lesson || { intuition: '', steps: [], pitfalls: '', personalNotes: '' };
+        studioBodyHtml = `
+          <div class="grid-2">
+            <div style="background:rgba(15,23,42,0.4); padding:16px; border-radius:12px; border:1px solid var(--border-color);">
+              <h4 style="color:#818cf8; margin-bottom:8px;">💡 הסבר אינטואיטיבי (מה באמת קורה פה?)</h4>
+              <p style="font-size:0.93rem; white-space:pre-wrap;">${esc(lesson.intuition || 'לחץ על כפתור ה-AI למעלה כדי לייצר הסבר מותאם אישית.')}</p>
+
+              <h4 style="color:#34d399; margin:16px 0 8px;">🛠️ אלגוריתם / שלבי פתרון מומלצים לתרגיל:</h4>
+              <ul style="padding-right:18px; font-size:0.92rem; display:flex; flex-direction:column; gap:6px;">
+                ${(Array.isArray(lesson.steps) ? lesson.steps : []).map(s => `<li>${esc(s)}</li>`).join('')}
+              </ul>
+            </div>
+
+            <div style="background:rgba(15,23,42,0.4); padding:16px; border-radius:12px; border:1px solid var(--border-color);">
+              <h4 style="color:#fb7185; margin-bottom:8px;">⚠️ מוקשים וטעויות נפוצות במבחנים:</h4>
+              <p style="font-size:0.92rem; margin-bottom:16px; white-space:pre-wrap;">${esc(lesson.pitfalls || 'שים לב להגדרות פורמליות ולמקרי קצה.')}</p>
+
+              <h4 style="color:#fbbf24; margin-bottom:8px;">📝 הסיכום והדגשים האישיים שלי:</h4>
+              <textarea rows="4" id="topic-personal-notes" placeholder="כתוב כאן תובנות שלך, נוסחאות או דגשים מהתרגול..." onchange="saveTopicPersonalNotes('${tp.id}', this.value)">${esc(lesson.personalNotes || '')}</textarea>
+              <div style="margin-top:8px; display:flex; justify-content:space-between;">
+                <button class="btn btn-secondary btn-sm" onclick="saveTopicPersonalNotes('${tp.id}', document.getElementById('topic-personal-notes').value)">💾 שמור סיכום</button>
+                <button class="btn btn-primary btn-sm" onclick="generateAiContentForTopic('${tp.id}')">✨ שדרג שיעור עם AI</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (activeStudioTab === 'chat') {
+        const history = tp.chatHistory || [];
+        studioBodyHtml = `
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+              <div style="font-size:0.86rem; color:var(--text-muted);">
+                💬 <strong>צ'אט תרגול אישי על "${esc(tp.title)}":</strong> שאל שאלות, בקש דוגמה פתורה או בקש שאבחן אותך!
+              </div>
+              <div class="item-actions">
+                <button class="btn btn-secondary btn-sm" onclick="sendQuickPrompt('${tp.id}', 'תסביר לי את הנושא מאפס עם דוגמה פשוטה')">הסבר עם דוגמה</button>
+                <button class="btn btn-secondary btn-sm" onclick="sendQuickPrompt('${tp.id}', 'תן לי שאלת הבנה ברמת מבחן ותבדוק אותי')">בחן אותי 🎯</button>
+                <button class="btn btn-secondary btn-sm" onclick="copyPromptForGemini('${tp.id}')">📋 העתק פרומפט מלא ל-Gemini</button>
+              </div>
+            </div>
+
+            <div class="chat-box">
+              <div class="chat-messages" id="studio-chat-messages">
+                ${history.map(m => `
+                  <div class="chat-bubble ${m.role === 'user' ? 'user' : 'ai'}">${esc(m.text)}</div>
+                `).join('')}
+              </div>
+              <div class="chat-input-row">
+                <input type="text" id="studio-chat-input" placeholder="כתוב שאלה על ${esc(tp.title)}..." onkeydown="if(event.key==='Enter') sendStudioChatMessage('${tp.id}')" />
+                <button class="btn btn-primary" onclick="sendStudioChatMessage('${tp.id}')">שלח 🚀</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (activeStudioTab === 'quiz') {
+        studioBodyHtml = `
+          <div style="text-align:center; padding:16px;">
+            <h4 style="font-size:1.15rem; margin-bottom:8px;">⏱️ טיימר פומודורו ממוקד לנושא: ${esc(tp.title)}</h4>
+            <div style="font-size:3rem; font-weight:800; color:var(--accent-secondary); margin:12px 0;">${mins}:${secs}</div>
+            <div style="display:flex; justify-content:center; gap:10px; margin-bottom:18px;">
+              <button class="btn btn-primary" onclick="togglePomodoro()">${pomodoroRunning ? '⏸️ השהה' : '▶️ התחל 25 דקות מיקוד'}</button>
+              <button class="btn btn-secondary" onclick="resetPomodoro()">🔄 אפס טיימר</button>
+            </div>
+            <p style="font-size:0.88rem; color:var(--text-muted); max-width:500px; margin:0 auto;">
+              מומלץ: עבוד 25 דקות רצופות על פתרון תרגילים בנושא <strong>${esc(tp.title)}</strong>, סמן את הכרטיסיות, ואז קח 5 דקות הפסקה.
+            </p>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="studio-overlay">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                <span class="badge badge-course" style="background:${c.color}">${esc(c.name)}</span>
+                <span class="badge badge-warning">חדר למידה פעיל 🧠</span>
+              </div>
+              <h2 style="font-size:1.4rem;">${esc(tp.title)}</h2>
+              <p style="font-size:0.88rem; color:var(--text-muted);">מוקד הקושי: ${esc(tp.struggleNotes || 'לא צוין')}</p>
+            </div>
+            <div class="item-actions">
+              <button class="btn btn-emerald btn-sm" onclick="markTopicMastered('${tp.id}')">
+                ${tp.status === 'פוצח!' ? '✅ הנושא פוצח!' : 'סמן כ"פוצח!" 🎉'}
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="closeTopicStudio()">✕ סגור חלון למידה</button>
+            </div>
+          </div>
+
+          <div class="studio-tabs">
+            <button class="studio-tab ${activeStudioTab === 'flashcards' ? 'active' : ''}" onclick="switchStudioTab('flashcards')">
+              🃏 פלאשקארדס (${cards.length})
+            </button>
+            <button class="studio-tab ${activeStudioTab === 'lesson' ? 'active' : ''}" onclick="switchStudioTab('lesson')">
+              📖 שיעור מובנה ושלבי פתרון
+            </button>
+            <button class="studio-tab ${activeStudioTab === 'chat' ? 'active' : ''}" onclick="switchStudioTab('chat')">
+              💬 צ'אט למידה איתי
+            </button>
+            <button class="studio-tab ${activeStudioTab === 'quiz' ? 'active' : ''}" onclick="switchStudioTab('quiz')">
+              ⏱️ פומודורו ומיקוד
+            </button>
+          </div>
+
+          ${studioBodyHtml}
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3.6 מעקב אימונים מלא (Workouts Tracker)
+    // -------------------------------------------------------------------------
+    function renderWorkouts() {
+      const sortedWorkouts = [...state.workouts].sort((a, b) => b.date.localeCompare(a.date));
+      const totalWorkouts = state.workouts.length;
+      const doneWorkouts = state.workouts.filter(w => w.completed).length;
+      const totalMinutes = state.workouts.filter(w => w.completed).reduce((acc, w) => acc + (Number(w.durationMin) || 0), 0);
+      const totalPRs = state.workouts.reduce((acc, w) => acc + (w.exercises || []).filter(ex => ex.pr).length, 0);
+
+      return `
+        <div class="stats-row">
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">אימונים שבוצעו</div>
+              <div class="stat-value">${doneWorkouts} / ${totalWorkouts}</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(16,185,129,0.18); color:#34d399;">💪</div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">זמן אימון מצטבר</div>
+              <div class="stat-value">${totalMinutes} דק׳</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(6,182,212,0.18); color:#22d3ee;">⏱️</div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">שיאים אישיים (PRs)</div>
+              <div class="stat-value">${totalPRs} 🏆</div>
+            </div>
+            <div class="stat-icon" style="background:rgba(245,158,11,0.18); color:#fbbf24;">🔥</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🏋️ יומן ומעקב אימונים מלא (תרגילים, סטים, חזרות, משקלים וריצות)</div>
+              <p style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">
+                כל אימון שתשבץ יופיע אוטומטית בלו"ז היומי בדף הראשי בתאריך שלו. תוכל להוסיף תרגילים, לעדכן משקלים ולסמן שיאים.
+              </p>
+            </div>
+            <button class="btn btn-primary" onclick="openWorkoutModal()">➕ שבץ / תעד אימון חדש</button>
+          </div>
+
+          ${sortedWorkouts.length === 0 ? `
+            <div style="text-align:center; padding:40px; color:var(--text-muted);">
+              <p>עדיין לא תיעדת או שיבצת אימונים.</p>
+              <button class="btn btn-primary" style="margin-top:12px;" onclick="openWorkoutModal()">+ שבץ אימון ראשון</button>
+            </div>
+          ` : `
+            <div class="grid-2">
+              ${sortedWorkouts.map(w => `
+                <div class="card" style="margin-bottom:0; border-top:4px solid ${w.completed ? '#10b981' : '#6366f1'}; background:rgba(15,23,42,0.4);">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div>
+                      <span class="badge badge-Workout">${esc(w.category)}</span>
+                      <span class="badge ${w.completed ? 'badge-success' : 'badge-warning'}">${w.completed ? '✅ בוצע' : '⏳ מתוכנן'}</span>
+                    </div>
+                    <div class="item-actions">
+                      <button class="btn btn-secondary btn-sm" onclick="openWorkoutModal('${w.id}')">✏️ ערוך</button>
+                      <button class="btn btn-danger btn-sm" onclick="deleteWorkout('${w.id}')">🗑️</button>
+                    </div>
+                  </div>
+
+                  <h3 style="font-size:1.12rem; margin-bottom:4px;">${esc(w.title)}</h3>
+                  <div style="font-size:0.84rem; color:var(--text-muted); margin-bottom:10px;">
+                    📅 ${formatHebrewDate(w.date)} בשעה ${esc(w.time || '18:00')} • ⏱️ ${esc(w.durationMin || 60)} דק׳ • עצימות (RPE): ${esc(w.rpe || 7)}/10
+                  </div>
+                  ${w.notes ? `<div style="font-size:0.84rem; padding:8px 10px; background:rgba(255,255,255,0.04); border-radius:8px; margin-bottom:10px; white-space:pre-wrap;">💬 ${esc(w.notes)}</div>` : ''}
+
+                  <div style="overflow-x:auto; margin-bottom:12px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:0.83rem;">
+                      <thead>
+                        <tr style="border-bottom:1px solid var(--border-color); color:var(--text-muted); text-align:right;">
+                          <th style="padding:6px;">תרגיל</th>
+                          <th style="padding:6px;">סטים</th>
+                          <th style="padding:6px;">חזרות/זמן</th>
+                          <th style="padding:6px;">משקל / מרחק</th>
+                          <th style="padding:6px;"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${(w.exercises || []).map((ex, idx) => `
+                          <tr style="border-bottom:1px solid rgba(148,163,184,0.08);">
+                            <td style="padding:6px; font-weight:600;">${esc(ex.name)} ${ex.pr ? '🏆' : ''}</td>
+                            <td style="padding:6px;">${esc(ex.sets)}</td>
+                            <td style="padding:6px;">${esc(ex.reps)}</td>
+                            <td style="padding:6px;">
+                              ${ex.weightKg ? `${esc(ex.weightKg)} ק"ג` : ''}
+                              ${ex.distanceKm ? `${esc(ex.distanceKm)} ק"מ` : ''}
+                              ${!ex.weightKg && !ex.distanceKm ? 'משקל גוף' : ''}
+                            </td>
+                            <td style="padding:6px; text-align:left;">
+                              <button class="btn btn-danger btn-sm" style="padding:1px 5px; font-size:0.7rem;" onclick="removeExerciseFromWorkout('${w.id}', ${idx})">✕</button>
+                            </td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="exercise-add-row">
+                    <input type="text" id="ex-name-${w.id}" placeholder="שם תרגיל..." style="padding:6px; font-size:0.8rem;" />
+                    <input type="number" id="ex-sets-${w.id}" placeholder="סטים" value="3" style="padding:6px; font-size:0.8rem;" />
+                    <input type="text" id="ex-reps-${w.id}" placeholder="חזרות" value="10" style="padding:6px; font-size:0.8rem;" />
+                    <input type="text" id="ex-weight-${w.id}" placeholder="ק״ג/ק״מ" style="padding:6px; font-size:0.8rem;" />
+                    <button class="btn btn-secondary btn-sm" onclick="quickAddExercise('${w.id}')">+ תרגיל</button>
+                  </div>
+
+                  <div style="display:flex; justify-content:flex-end;">
+                    <button class="btn ${w.completed ? 'btn-secondary' : 'btn-emerald'} btn-sm" onclick="toggleWorkoutDone('${w.id}')">
+                      ${w.completed ? 'סמן כ"טרם בוצע"' : 'סמן אימון כ"בוצע" ✅'}
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // 3.7 מדריך העלאה לאינטרנט, שימוש בנייד, Google Drive ועריכת הקוד (Cloud & Code)
+    // -------------------------------------------------------------------------
+    function renderCloudGuide() {
+      return `
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🌐 איך להעלות את האתר לכתובת אינטרנט אמיתית (חינם) ולערוך קוד</div>
+            </div>
+            <div style="font-size:0.92rem; display:flex; flex-direction:column; gap:14px;">
+              <div style="padding:14px; border-radius:12px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3);">
+                <strong>שלב 1: העלאה מהירה לכתובת אינטרנט קבועה (GitHub Pages)</strong>
+                <ol style="padding-right:20px; margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+                  <li>צור חשבון חינמי ב-<strong>GitHub.com</strong> ופתח מאגר חדש (New Repository) בשם <code>degree-pulse</code>.</li>
+                  <li>העלה לשם את הקובץ הזה (שמו כבר <code>index.html</code>).</li>
+                  <li>היכנס להגדרות המאגר (Settings → Pages) ובחר ב-Branch הראשי (<code>main</code>) -> תוך דקה תקבל כתובת אינטרנט קבועה משלך שפתוחה מכל טלפון ומחשב!</li>
+                </ol>
+              </div>
+
+              <div style="padding:14px; border-radius:12px; background:rgba(6,182,212,0.12); border:1px solid rgba(6,182,212,0.3);">
+                <strong>שלב 2: איך משנים דברים בקוד גם כשהאתר כבר באוויר?</strong>
+                <ul style="padding-right:20px; margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+                  <li>נכנסים לקובץ <code>index.html</code> ב-GitHub, לוחצים על סמל העיפרון (Edit), משנים צבע/טקסט/פיצ'ר ולוחצים <strong>Commit changes</strong>. האתר החי מתעדכן אוטומטית תוך 30 שניות!</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">☁️ גיבוי, סנכרון בין מחשב לטלפון וניהול קבצים ב-Google Drive</div>
+            </div>
+            <div style="font-size:0.92rem; display:flex; flex-direction:column; gap:14px;">
+              <p style="color:var(--text-muted);">
+                הנתונים שאתה מזין נשמרים אוטומטית בדפדפן שלך (<code>LocalStorage</code>). כדי להעביר נתונים בין המחשב לטלפון או לגבות הכל:
+              </p>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="exportBackup()">⬇️ הורד קובץ גיבוי (JSON)</button>
+                <label class="btn btn-secondary" style="margin:0; cursor:pointer;">
+                  ⬆️ טען קובץ גיבוי למכשיר זה
+                  <input type="file" accept=".json" style="display:none" onchange="importBackup(event)" />
+                </label>
+                <button class="btn btn-danger btn-sm" onclick="resetAllData()">🧹 נקה את כל הנתונים (דף חלק)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 4. פעולות אינטראקטיביות (CRUD, Subtasks, Studio, Workouts)
+    // =========================================================================
+    function openModal(html) {
+      document.getElementById('modal-content').innerHTML = html;
+      document.getElementById('modal-backdrop').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('modal-backdrop').classList.remove('open');
+    }
+
+    // --- קורסים ---
+    function openCourseModal(courseId = null) {
+      const existing = state.courses.find(c => c.id === courseId) || {
+        name: '', lecturer: '', credits: 3, color: '#6366f1', driveUrl: ''
+      };
+      openModal(`
+        <h3 style="margin-bottom:16px;">${courseId ? '✏️ עריכת קורס' : '➕ הוספת קורס חדש'}</h3>
+        <div class="form-group">
+          <label>שם הקורס *</label>
+          <input type="text" id="m-course-name" value="${esc(existing.name)}" placeholder="למשל: אלגברה לינארית 1" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>שם המרצה / מתרגל</label>
+            <input type="text" id="m-course-lecturer" value="${esc(existing.lecturer || '')}" placeholder="ד״ר..." />
+          </div>
+          <div class="form-group">
+            <label>נקודות זכות (נ"ז)</label>
+            <input type="number" step="0.5" id="m-course-credits" value="${esc(existing.credits || 3)}" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>צבע זיהוי במערכת</label>
+            <input type="color" id="m-course-color" value="${safeColor(existing.color)}" style="height:42px; padding:4px;" />
+          </div>
+          <div class="form-group">
+            <label>קישור לתיקיית Google Drive של הקורס</label>
+            <input type="url" id="m-course-drive" value="${esc(existing.driveUrl || '')}" placeholder="https://drive.google.com/..." />
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn btn-secondary" onclick="closeModal()">ביטול</button>
+          <button class="btn btn-primary" onclick="saveCourse('${courseId || ''}')">💾 שמור קורס</button>
+        </div>
+      `);
+    }
+
+    function saveCourse(courseId) {
+      const name = document.getElementById('m-course-name').value.trim();
+      if (!name) return alert('נא להזין את שם הקורס');
+      const obj = {
+        id: courseId || uid('c'),
+        name,
+        lecturer: document.getElementById('m-course-lecturer').value.trim(),
+        credits: parseFloat(document.getElementById('m-course-credits').value) || 0,
+        color: document.getElementById('m-course-color').value,
+        driveUrl: document.getElementById('m-course-drive').value.trim()
+      };
+      if (courseId) {
+        state.courses = state.courses.map(c => c.id === courseId ? obj : c);
+      } else {
+        state.courses.push(obj);
+      }
+      saveState();
+      closeModal();
+      renderCurrentView();
+    }
+
+    function deleteCourse(courseId) {
+      if (!confirm('למחוק את הקורס?')) return;
+      state.courses = state.courses.filter(c => c.id !== courseId);
+      saveState();
+      renderCurrentView();
+    }
+
+    // --- מערכת שעות ---
+    function openScheduleModal(slotId = null, prefillCourseId = null) {
+      const existing = state.schedule.find(s => s.id === slotId) || {
+        courseId: prefillCourseId || (state.courses[0]?.id || 'general'),
+        customCourseName: '',
+        dayOfWeek: new Date(selectedDate + 'T12:00:00').getDay(),
+        startTime: '10:00',
+        endTime: '12:00',
+        type: 'הרצאה',
+        location: ''
+      };
+      openModal(`
+        <h3 style="margin-bottom:16px;">${slotId ? '✏️ עריכת משבצת במערכת שעות' : '➕ הוספת שיעור למערכת שעות'}</h3>
+        <div class="form-group">
+          <label>בחר קורס קיים</label>
+          <select id="m-sched-course">
+            ${renderCourseOptions(existing.courseId)}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>או הקלד שם קורס חדש (ייצור את הקורס אוטומטית אם לא קיים)</label>
+          <input type="text" id="m-sched-new-course" value="${esc(existing.customCourseName || '')}" placeholder="למשל: מבוא למדעי המחשב..." />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>יום בשבוע</label>
+            <select id="m-sched-day">
+              ${[0,1,2,3,4,5].map(d => `<option value="${d}" ${Number(existing.dayOfWeek) === d ? 'selected' : ''}>יום ${DAYS_HEB[d]}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>סוג שיעור</label>
+            <select id="m-sched-type">
+              ${['הרצאה', 'תרגול', 'מעבדה', 'סמינר', 'שעת קבלה'].map(tp => `<option value="${tp}" ${existing.type === tp ? 'selected' : ''}>${tp}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>שעת התחלה</label>
+            <input type="time" id="m-sched-start" value="${esc(existing.startTime)}" />
+          </div>
+          <div class="form-group">
+            <label>שעת סיום</label>
+            <input type="time" id="m-sched-end" value="${esc(existing.endTime)}" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>מיקום (בניין/כיתה או קישור לזום)</label>
+          <input type="text" id="m-sched-loc" value="${esc(existing.location || '')}" placeholder="למשל: בניין 34 חדר 102" />
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn btn-secondary" onclick="closeModal()">ביטול</button>
+          <button class="btn btn-primary" onclick="saveScheduleSlot('${slotId || ''}')">💾 שמור במערכת</button>
+        </div>
+      `);
+    }
+
+    function saveScheduleSlot(slotId) {
+      let courseId = document.getElementById('m-sched-course').value;
+      const newCourseName = document.getElementById('m-sched-new-course').value.trim();
+
+      if (newCourseName) {
+        const colors = ['#6366f1', '#06b6d4', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6'];
+        const newCourse = {
+          id: uid('c'),
+          name: newCourseName,
+          lecturer: '',
+          credits: 3,
+          color: colors[state.courses.length % colors.length],
+          driveUrl: ''
+        };
+        state.courses.push(newCourse);
+        courseId = newCourse.id;
+      }
+
+      const obj = {
+        id: slotId || uid('s'),
+        courseId,
+        dayOfWeek: Number(document.getElementById('m-sched-day').value),
+        type: document.getElementById('m-sched-type').value,
+        startTime: document.getElementById('m-sched-start').value,
+        endTime: document.getElementById('m-sched-end').value,
+        location: document.getElementById('m-sched-loc').value.trim()
+      };
+      if (slotId) {
+        state.schedule = state.schedule.map(s => s.id === slotId ? obj : s);
+      } else {
+        state.schedule.push(obj);
+      }
+      saveState();
+      closeModal();
+      renderCurrentView();
+    }
+
+    function deleteScheduleSlot(slotId) {
+      state.schedule = state.schedule.filter(s => s.id !== slotId);
+      saveState();
+      renderCurrentView();
+    }
+
+    // --- עבודות ובחנים ---
+    function openTaskModal(taskId = null) {
+      const existing = state.tasks.find(t => t.id === taskId) || {
+        title: '',
+        courseId: state.courses[0]?.id || 'general',
+        type: 'עבודה',
+        dueDate: selectedDate,
+        dueTime: '23:59',
+        priority: 'גבוהה',
+        status: 'לביצוע',
+        notes: '',
+        subtasks: [],
+        files: []
+      };
+      openModal(`
+        <h3 style="margin-bottom:16px;">${taskId ? '✏️ עריכת עבודה / בוחן' : '➕ הוספת עבודה או בוחן חדש'}</h3>
+        <div class="form-group">
+          <label>כותרת העבודה / הבוחן *</label>
+          <input type="text" id="m-task-title" value="${esc(existing.title)}" placeholder="למשל: מטלה 1 / בוחן אמצע" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>קורס</label>
+            <select id="m-task-course">
+              ${renderCourseOptions(existing.courseId)}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>סוג</label>
+            <select id="m-task-type">
+              ${['עבודה', 'בוחן', 'פרויקט', 'דוח מעבדה'].map(tp => `<option value="${tp}" ${existing.type === tp ? 'selected' : ''}>${tp}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>תאריך הגשה / קיום *</label>
+            <input type="date" id="m-task-date" value="${esc(existing.dueDate)}" />
+          </div>
+          <div class="form-group">
+            <label>שעת הגשה / התחלה</label>
+            <input type="time" id="m-task-time" value="${esc(existing.dueTime || '23:59')}" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>עדיפות</label>
+            <select id="m-task-prio">
+              ${['גבוהה', 'בינונית', 'נמוכה'].map(p => `<option value="${p}" ${existing.priority === p ? 'selected' : ''}>${p}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>סטטוס</label>
+            <select id="m-task-status">
+              ${['לביצוע', 'בתהליך', 'הוגש'].map(s => `<option value="${s}" ${existing.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>הערות והנחיות לעבודה</label>
+          <textarea rows="2" id="m-task-notes" placeholder="דגשים להגשה, זוגות, קישורים...">${esc(existing.notes || '')}</textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn btn-secondary" onclick="closeModal()">ביטול</button>
+          <button class="btn btn-primary" onclick="saveTask('${taskId || ''}')">💾 שמור</button>
+        </div>
+      `);
+    }
+
+    function saveTask(taskId) {
+      const title = document.getElementById('m-task-title').value.trim();
+      if (!title) return alert('נא להזין כותרת');
+      const prev = state.tasks.find(t => t.id === taskId);
+      const obj = {
+        id: taskId || uid('t'),
+        title,
+        courseId: document.getElementById('m-task-course').value,
+        type: document.getElementById('m-task-type').value,
+        dueDate: document.getElementById('m-task-date').value,
+        dueTime: document.getElementById('m-task-time').value,
+        priority: document.getElementById('m-task-prio').value,
+        status: document.getElementById('m-task-status').value,
+        notes: document.getElementById('m-task-notes').value.trim(),
+        subtasks: prev ? prev.subtasks : [],
+        files: prev ? prev.files : []
+      };
+      if (taskId) {
+        state.tasks = state.tasks.map(t => t.id === taskId ? obj : t);
+      } else {
+        state.tasks.push(obj);
+      }
+      saveState();
+      closeModal();
+      renderCurrentView();
+    }
+
+    function deleteTask(taskId) {
+      if (!confirm('למחוק את העבודה/בוחן?')) return;
+      state.tasks = state.tasks.filter(t => t.id !== taskId);
+      saveState();
+      renderCurrentView();
+    }
+
+    function toggleTaskCompleted(taskId) {
+      const t = state.tasks.find(x => x.id === taskId);
+      if (!t) return;
+      t.status = t.status === 'הוגש' ? 'בתהליך' : 'הוגש';
+      saveState();
+      renderCurrentView();
+    }
+
+    function addSubtask(taskId) {
+      const input = document.getElementById(`new-subtask-${taskId}`);
+      if (!input || !input.value.trim()) return;
+      const t = state.tasks.find(x => x.id === taskId);
+      if (!t) return;
+      t.subtasks = t.subtasks || [];
+      t.subtasks.push({ id: uid('st'), text: input.value.trim(), done: false });
+      saveState();
+      renderCurrentView();
+    }
+
+    function toggleSubtask(taskId, subtaskId) {
+      const t = state.tasks.find(x => x.id === taskId);
+      if (!t) return;
+      const st = (t.subtasks || []).find(s => s.id === subtaskId);
+      if (st) st.done = !st.done;
+      saveState();
+      renderCurrentView();
+    }
+
+    function removeSubtask(taskId, subtaskId) {
+      const t = state.tasks.find(x => x.id === taskId);
+      if (!t) return;
+      t.subtasks = (t.subtasks || []).filter(s => s.id !== subtaskId);
+      saveState();
+      renderCurrentView();
+    }
+
+    // --- צירוף קבצים וקישורי Google Drive ---
+    function openAttachmentModal(targetType, targetId) {
+      openModal(`
+        <h3 style="margin-bottom:14px;">📎 צירוף קובץ או קישור Google Drive</h3>
+        <div class="form-group">
+          <label>שם הקובץ לתצוגה *</label>
+          <input type="text" id="m-att-name" placeholder="למשל: טיוטת פתרון ב-Google Docs / קובץ הוראות PDF" />
+        </div>
+        <div class="form-group">
+          <label>אפשרות א׳: הדבק קישור לקובץ או תיקייה ב-Google Drive (מומלץ לנייד ולמחשב)</label>
+          <input type="url" id="m-att-url" placeholder="https://drive.google.com/..." />
+        </div>
+        <div class="form-group" style="padding:12px; border:1px dashed var(--border-color); border-radius:10px;">
+          <label>אפשרות ב׳: או בחר קובץ מהמחשב/טלפון לשמירה מקומית באתר (עד 2MB)</label>
+          <input type="file" id="m-att-file" />
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn btn-secondary" onclick="closeModal()">ביטול</button>
+          <button class="btn btn-primary" onclick="saveAttachment('${targetType}', '${targetId}')">📎 צרף</button>
+        </div>
+      `);
+    }
+
+    function saveAttachment(targetType, targetId) {
+      const nameInput = document.getElementById('m-att-name').value.trim();
+      const urlInput = document.getElementById('m-att-url').value.trim();
+      const fileInput = document.getElementById('m-att-file');
+
+      const targetList = targetType === 'task' ? state.tasks : state.exams;
+      const item = targetList.find(x => x.id === targetId);
+      if (!item) return;
+      item.files = item.files || [];
+
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        if (file.size > 2.5 * 1024 * 1024) {
+          return alert('הקובץ גדול מ-2.5MB. מומלץ להעלות אותו ל-Google Drive ולהדביק כאן את הקישור שלו!');
+        }
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          item.files.push({
+            id: uid('f'),
+            name: nameInput || file.name,
+            fileName: file.name,
+            url: evt.target.result,
+            type: 'local'
+          });
+          saveState();
+          closeModal();
+          renderCurrentView();
+        };
+        reader.readAsDataURL(file);
+      } else {
+        if (!urlInput) return alert('נא להדביק קישור מ-Drive או לבחור קובץ');
+        item.files.push({
+          id: uid('f'),
+          name: nameInput || 'קובץ Google Drive',
+          url: urlInput,
+          type: 'drive'
+        });
+        saveState();
+        closeModal();
+        renderCurrentView();
+      }
+    }
+
+    function removeAttachment(targetType, targetId, fileId) {
+      const targetList = targetType === 'task' ? state.tasks : state.exams;
+      const item = targetList.find(x => x.id === targetId);
+      if (!item) return;
+      item.files = (item.files || []).filter(f => f.id !== fileId);
+      saveState();
+      renderCurrentView();
+    }
+
+    // --- מבחנים ---
+    function openExamModal(examId = null) {
+      const existing = state.exams.find(e => e.id === examId) || {
+        courseId: state.courses[0]?.id || 'general',
+        title: '',
+        term: 'מועד א׳',
+        date: addDaysISO(getTodayISO(), 14),
+        time: '09:00',
+        location: ''
+      };
+      openModal(`
+        <h3 style="margin-bottom:16px;">${examId ? '✏️ עריכת מבחן' : '➕ הוספת מבחן חדש'}</h3>
+        <div class="form-group">
+          <label>כותרת המבחן *</label>
+          <input type="text" id="m-exam-title" value="${esc(existing.title)}" placeholder="למשל: מבחן סוף סמסטר" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>קורס</label>
+            <select id="m-exam-course">
+              ${renderCourseOptions(existing.courseId)}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>מועד</label>
+            <select id="m-exam-term">
+              ${['מועד א׳', 'מועד ב׳', 'מועד מיוחד', 'בחן אמצע'].map(tm => `<option value="${tm}" ${existing.term === tm ? 'selected' : ''}>${tm}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>תאריך המבחן *</label>
+            <input type="date" id="m-exam-date" value="${esc(existing.date)}" />
+          </div>
+          <div class="form-group">
+            <label>שעת התחלה</label>
+            <input type="time" id="m-exam-time" value="${esc(existing.time || '09:00')}" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>מיקום / כיתה</label>
+          <input type="text" id="m-exam-loc" value="${esc(existing.location || '')}" placeholder="בניין, חדר..." />
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn btn-secondary" onclick="closeModal()">ביטול</button>
+          <button class="btn btn-primary" onclick="saveExam('${examId || ''}')">💾 שמור מבחן</button>
+        </div>
+      `);
+    }
+
+    function saveExam(examId) {
+      const title = document.getElementById('m-exam-title').value.trim();
+      if (!title) return alert('נא להזין את שם המבחן');
+      const prev = state.exams.find(e => e.id === examId);
+      const obj = {
+        id: examId || uid('e'),
+        title,
+        courseId: document.getElementById('m-exam-course').value,
+        term: document.getElementById('m-exam-term').value,
+        date: document.getElementById('m-exam-date').value,
+        time: document.getElementById('m-exam-time').value,
+        location: document.getElementById('m-exam-loc').value.trim(),
+        syllabus: prev ? prev.syllabus : [],
+        files: prev ? prev.files : []
+      };
+      if (examId) {
+        state.exams = state.exams.map(e => e.id === examId ? obj : e);
+      } else {
+        state.exams.push(obj);
+      }
+      saveState();
+      closeModal();
+      renderCurrentView();
+    }
+
+    function deleteExam(examId) {
+      if (!confirm('למחוק את המבחן?')) return;
+      state.exams = state.exams.filter(e => e.id !== examId);
+      saveState();
+      renderCurrentView();
+    }
+
+    function addExamSyllabus(examId) {
+      const inp = document.getElementById(`new-syl-${examId}`);
+      if (!inp || !inp.value.trim()) return;
+      const ex = state.exams.find(e => e.id === examId);
+      if (!ex) return;
+      ex.syllabus = ex.syllabus || [];
+      ex.syllabus.push({ id: uid('sy'), text: inp.value.trim(), done: false });
+      saveState();
+      renderCurrentView();
+    }
+
+    function toggleExamSyllabus(examId, syId) {
+      const ex = state.exams.find(e => e.id === examId);
+      if (!ex) return;
+      const item = (ex.syllabus || []).find(s => s.id === syId);
+      if (item) item.done = !item.done;
+      saveState();
+      renderCurrentView();
+    }
+
+    function removeExamSyllabus(examId, syId) {
+      const ex = state.exams.find(e => e.id === examId);
+      if (!ex) return;
+      ex.syllabus = (ex.syllabus || []).filter(s => s.id !== syId);
+      saveState();
+      renderCurrentView();
+    }
+
+    // --- נושאים לחיזוק וחדר למידה (Study Studio) ---
+    function openTopicModal(topicId = null) {
+      const existing = state.topics.find(tp => tp.id === topicId) || {
+        courseId: state.courses[0]?.id || 'general',
+        title: '',
+        difficulty: 4,
+        status: 'צריך חיזוק',
+        struggleNotes: ''
+      };
+      openModal(`
+        <h3 style="margin-bottom:14px;">${topicId ? '✏️ עריכת נושא לחיזוק' : '🧠 הוספת נושא שאני מתקשה בו'}</h3>
+        <p style="font-size:0.84rem; color:var(--text-muted); margin-bottom:14px;">
+          ברגע שתשמור את הנושא, המערכת תייצר עבורו אוטומטית חדר למידה עם כרטיסיות שינון (פלאשקארדס), תבנית שיעור מובנית וצ'אט תרגול!
+        </p>
+        <div class="form-group">
+          <label>שם הנושא *</label>
+          <input type="text" id="m-topic-title" value="${esc(existing.title)}" placeholder="למשל: אלגוריתם דייקסטרה / משפט סטוקס / רקורסיה" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>קורס</label>
+            <select id="m-topic-course">
+              ${renderCourseOptions(existing.courseId)}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>רמת קושי (1-5)</label>
+            <select id="m-topic-diff">
+              ${[1,2,3,4,5].map(n => `<option value="${n}" ${Number(existing.difficulty) === n ? 'selected' : ''}>${n}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>במה בדיוק אתה מתקשה בנושא הזה? (יעזור לייצר לך שיעור ופלאשקארדס מדויקים)</label>
+          <textarea rows="3" id="m-topic-notes" placeholder="למשל: אני לא מבין למה האלגוריתם נכשל כשיש משקלים שליליים...">${esc(existing.struggleNotes || '')}</textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn btn-secondary" onclick="closeModal()">ביטול</button>
+          <button class="btn btn-primary" onclick="saveTopic('${topicId || ''}')">🚀 שמור וייצר ערכת למידה</button>
+        </div>
+      `);
+    }
+
+    function buildStarterKitForTopic(title, courseName, struggleNotes) {
+      return {
+        lesson: {
+          intuition: `הנושא "${title}" בקורס ${courseName} עוסק בעקרונות ליבה שמופיעים כמעט בכל מבחן. המטרה המרכזית היא להבין את ההגדרה הפורמלית, לזהות מתי מותר להשתמש במשפט/אלגוריתם, ולפרק את נקודת הקושי שציינת: "${struggleNotes || 'הבנת שלבי הפתרון המעשיים'}".`,
+          steps: [
+            `1. זיהוי תנאי הפתיחה: בדוק שכל תנאי הקדם של "${title}" מתקיימים בשאלה.`,
+            `2. רישום הנוסחה/האלגוריתם המרכזי והצבת הנתונים בצורה מסודרת.`,
+            `3. בדיקת מקרי קצה (ערכים מאפסים, גבולות תחום, או קלט ריק).`,
+            `4. וידוא שהתוצאה הגיונית ביחס לשאלה המקורית.`
+          ],
+          pitfalls: `טעות נפוצה ב"${title}": דילוג על בדיקת תנאי המשפט לפני הפעלתו, או בלבול בסימנים/אינדקסים בשלב המעבר בין השלבים.`,
+          personalNotes: ''
+        },
+        flashcards: [
+          { q: `מהי ההגדרה והמטרה המרכזית של "${title}"?`, a: `נושא ליבה בקורס ${courseName}. מומלץ לוודא שליטה בהגדרה הפורמלית ובתנאי השימוש.` },
+          { q: `מהי נקודת הקושי המרכזית שחשוב לשים אליה לב ב-${title}?`, a: struggleNotes || 'בדיקת תנאי קצה ובחירת שיטת הפתרון המתאימה.' },
+          { q: `איזה צעד ראשון עושים כשמזהים שאלת מבחן על ${title}?`, a: 'רושמים את הנתונים, מוודאים שתנאי המשפט/אלגוריתם מתקיימים, ומפרקים לתתי-שלבים.' }
+        ],
+        chatHistory: [
+          { role: 'ai', text: `היי! יצרתי עבורך את חדר הלמידה לנושא "${title}" (${courseName}). ראיתי שרשמת: "${struggleNotes || 'רוצה לחזק את הנושא'}". איך בא לך שנתחיל? אפשר לעבור על פלאשקארדס, או שתכתוב לי כאן שאלה ספציפית ונפתור אותה יחד!` }
+        ]
+      };
+    }
+
+    function saveTopic(topicId) {
+      const title = document.getElementById('m-topic-title').value.trim();
+      if (!title) return alert('נא להזין את שם הנושא');
+      const courseId = document.getElementById('m-topic-course').value;
+      const courseName = getCourse(courseId).name;
+      const struggleNotes = document.getElementById('m-topic-notes').value.trim();
+      const prev = state.topics.find(tp => tp.id === topicId);
+
+      const starter = buildStarterKitForTopic(title, courseName, struggleNotes);
+      const newId = topicId || uid('tp');
+
+      const obj = {
+        id: newId,
+        title,
+        courseId,
+        difficulty: Number(document.getElementById('m-topic-diff').value),
+        status: prev ? prev.status : 'צריך חיזוק',
+        struggleNotes,
+        lesson: prev ? prev.lesson : starter.lesson,
+        flashcards: prev ? prev.flashcards : starter.flashcards,
+        chatHistory: prev ? prev.chatHistory : starter.chatHistory
+      };
+
+      if (topicId) {
+        state.topics = state.topics.map(tp => tp.id === topicId ? obj : tp);
+      } else {
+        state.topics.unshift(obj);
+      }
+
+      saveState();
+      closeModal();
+      openTopicStudio(newId);
+    }
+
+    function deleteTopic(topicId) {
+      if (!confirm('למחוק את הנושא מחדר הלמידה?')) return;
+      state.topics = state.topics.filter(tp => tp.id !== topicId);
+      if (activeStudioTopicId === topicId) activeStudioTopicId = null;
+      saveState();
+      renderCurrentView();
+    }
+
+    function openTopicStudio(topicId) {
+      activeStudioTopicId = topicId;
+      currentCardIndex = 0;
+      isCardFlipped = false;
+      currentTab = 'topics';
+      document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === 'topics');
+      });
+      renderCurrentView();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function closeTopicStudio() {
+      activeStudioTopicId = null;
+      renderCurrentView();
+    }
+
+    function switchStudioTab(tabName) {
+      activeStudioTab = tabName;
+      renderCurrentView();
+    }
+
+    function flipFlashcard() {
+      isCardFlipped = !isCardFlipped;
+      renderCurrentView();
+    }
+
+    function nextFlashcard(len) {
+      if (!len) return;
+      isCardFlipped = false;
+      currentCardIndex = (currentCardIndex + 1) % len;
+      renderCurrentView();
+    }
+
+    function prevFlashcard(len) {
+      if (!len) return;
+      isCardFlipped = false;
+      currentCardIndex = (currentCardIndex - 1 + len) % len;
+      renderCurrentView();
+    }
+
+    function openAddFlashcardModal(topicId) {
+      openModal(`
+        <h3 style="margin-bottom:14px;">🃏 הוספת כרטיסיית שינון חדשה</h3>
+        <div class="form-group">
+          <label>שאלה / מושג (צד קדמי) *</label>
+          <textarea rows="2" id="m-fc-q" placeholder="למשל: מהו תנאי הכרחי להתכנסות טור?"></textarea>
+        </div>
+        <div class="form-group">
+          <label>תשובה / הסבר (צד אחורי) *</label>
+          <textarea rows="3" id="m-fc-a" placeholder="האיבר הכללי שואף לאפס..."></textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn btn-secondary" onclick="closeModal()">ביטול</button>
+          <button class="btn btn-primary" onclick="saveNewFlashcard('${topicId}')">💾 הוסף כרטיסייה</button>
+        </div>
+      `);
+    }
+
+    function saveNewFlashcard(topicId) {
+      const q = document.getElementById('m-fc-q').value.trim();
+      const a = document.getElementById('m-fc-a').value.trim();
+      if (!q || !a) return alert('נא למלא שאלה ותשובה');
+      const tp = state.topics.find(x => x.id === topicId);
+      if (!tp) return;
+      tp.flashcards = tp.flashcards || [];
+      tp.flashcards.push({ q, a });
+      currentCardIndex = tp.flashcards.length - 1;
+      isCardFlipped = false;
+      saveState();
+      closeModal();
+      renderCurrentView();
+    }
+
+    function deleteCurrentFlashcard(topicId) {
+      const tp = state.topics.find(x => x.id === topicId);
+      if (!tp || !tp.flashcards.length) return;
+      tp.flashcards.splice(currentCardIndex, 1);
+      currentCardIndex = Math.max(0, currentCardIndex - 1);
+      isCardFlipped = false;
+      saveState();
+      renderCurrentView();
+    }
+
+    function saveTopicPersonalNotes(topicId, val) {
+      const tp = state.topics.find(x => x.id === topicId);
+      if (!tp) return;
+      tp.lesson = tp.lesson || {};
+      tp.lesson.personalNotes = val;
+      saveState();
+    }
+
+    function markTopicMastered(topicId) {
+      const tp = state.topics.find(x => x.id === topicId);
+      if (!tp) return;
+      tp.status = tp.status === 'פוצח!' ? 'בתרגול' : 'פוצח!';
+      saveState();
+      renderCurrentView();
+    }
+
+    // --- צ'אט למידה חכם ומחולל AI ---
+    function sendQuickPrompt(topicId, text) {
+      const inp = document.getElementById('studio-chat-input');
+      if (inp) inp.value = text;
+      sendStudioChatMessage(topicId);
+    }
+
+    async function sendStudioChatMessage(topicId) {
+      const inp = document.getElementById('studio-chat-input');
+      if (!inp || !inp.value.trim()) return;
+      const userText = inp.value.trim();
+      inp.value = '';
+
+      const tp = state.topics.find(x => x.id === topicId);
+      if (!tp) return;
+      tp.chatHistory = tp.chatHistory || [];
+      tp.chatHistory.push({ role: 'user', text: userText });
+      renderCurrentView();
+
+      const c = getCourse(tp.courseId);
+      const apiKey = (state.settings.geminiApiKey || '').trim();
+
+      if (apiKey) {
+        try {
+          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `אתה מורה פרטי אקדמי מצוין בעברית. הסטודנט לומד את הקורס "${c.name}" ומתקשה בנושא "${tp.title}". פירוט הקושי שלו: "${tp.struggleNotes}". ענה בצורה ברורה, מעודדת וממוקדת לשאלה הבאה שלו:\n\n${userText}`
+                }]
+              }]
+            })
+          });
+          const data = await resp.json();
+          const aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'קיבלתי! בוא נפרק את זה שלב אחר שלב.';
+          tp.chatHistory.push({ role: 'ai', text: aiReply });
+        } catch (err) {
+          tp.chatHistory.push({ role: 'ai', text: buildSmartLocalTutorResponse(tp, c, userText) });
+        }
+      } else {
+        tp.chatHistory.push({ role: 'ai', text: buildSmartLocalTutorResponse(tp, c, userText) });
+      }
+
+      saveState();
+      renderCurrentView();
+      const box = document.getElementById('studio-chat-messages');
+      if (box) box.scrollTop = box.scrollHeight;
+    }
+
+    function buildSmartLocalTutorResponse(tp, course, userText) {
+      if (userText.includes('בחן') || userText.includes('שאלה')) {
+        return `🎯 שאלת תרגול ברמת מבחן על "${tp.title}" (${course.name}):\n\nנתונה בעיה שבה עליך להחליט האם תנאי "${tp.title}" מתקיימים כאשר אחד הפרמטרים מתאפס.\n1. מהו התנאי הראשון שתבדוק?\n2. איך תמנע את הטעות הנפוצה של "${tp.lesson?.pitfalls || 'דילוג על מקרי קצה'}"?\n\nכתוב לי את כיוון הפתרון שלך ונבדוק אותו יחד!`;
+      }
+      if (userText.includes('דוגמה') || userText.includes('מאפס')) {
+        return `💡 בוא נפרק את "${tp.title}" בצורה הכי אינטואיטיבית שיש:\n\n• הרעיון המרכזי: ${tp.lesson?.intuition || ''}\n• איך ניגשים לתרגיל:\n${(tp.lesson?.steps || []).join('\n')}\n\nרוצה שנעמיק באחד השלבים האלה או שתעתיק פרומפט מלא לשיחה איתי ב-Gemini? (אפשר גם לחבר מפתח Gemini API בהגדרות למעלה לתשובות חיות ישירות כאן!)`;
+      }
+      return `מעולה ששאלת על "${userText}" בהקשר של ${tp.title}!\n\nכדי לפתור את זה נכון:\n1. חזור להגדרת הבסיס של ${tp.title} ובדוק מה נתון בשאלה.\n2. שים לב במיוחד למוקד הקושי שסימנת: "${tp.struggleNotes || 'דיוק בשלבי המעבר'}".\n3. טיפ: לחץ על "📋 העתק פרומפט מלא ל-Gemini" למעלה אם תרצה שאפתור איתך תרגיל מתמטי או קוד מלא בצ'אט הראשי שלנו, או הזן Gemini API Key בהגדרות האתר!`;
+    }
+
+    async function generateAiContentForTopic(topicId) {
+      const tp = state.topics.find(x => x.id === topicId);
+      if (!tp) return;
+      const c = getCourse(tp.courseId);
+      const apiKey = (state.settings.geminiApiKey || '').trim();
+
+      if (apiKey) {
+        try {
+          const prompt = `ייצר בפורמט JSON בלבד ערכת למידה בעברית עבור הנושא "${tp.title}" בקורס "${c.name}". קושי הסטודנט: "${tp.struggleNotes}".
+החזר אובייקט JSON במבנה:
+{"intuition": "...", "steps": ["1...", "2..."], "pitfalls": "...", "flashcards": [{"q": "...", "a": "..."}, {"q": "...", "a": "..."}, {"q": "...", "a": "..."}]}`;
+          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: 'application/json' }
+            })
+          });
+          const data = await resp.json();
+          const rawJson = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawJson) {
+            const parsed = JSON.parse(rawJson);
+            tp.lesson.intuition = parsed.intuition || tp.lesson.intuition;
+            tp.lesson.steps = parsed.steps || tp.lesson.steps;
+            tp.lesson.pitfalls = parsed.pitfalls || tp.lesson.pitfalls;
+            if (Array.isArray(parsed.flashcards)) {
+              tp.flashcards.push(...parsed.flashcards);
+            }
+            saveState();
+            renderCurrentView();
+            return alert('✨ נוצרו כרטיסיות ושיעור חדשים באמצעות Gemini AI!');
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      tp.flashcards.push(
+        { q: `שאלת תרגול (${tp.title}): מהו הצעד הקריטי לפני הפעלת המשפט/אלגוריתם?`, a: `בדיקת תנאי הקדם ומקרי הקצה ווידוא שאין סתירה להנחות היסוד בקורס ${c.name}.` },
+        { q: `איך מתמודדים עם הקושי: "${tp.struggleNotes || tp.title}" במבחן?`, a: `מפרקים את השאלה לשלבים מהשיעור המובנה ובודקים דוגמה קטנה לפני הכללה.` }
+      );
+      saveState();
+      renderCurrentView();
+      alert('✨ נוספו כרטיסיות תרגול חדשות! (טיפ: לחיבור יצירה חיה מבוססת Gemini AI, ניתן להזין מפתח API חינמי ב"הגדרות AI" בראש הדף).');
+    }
+
+    function copyPromptForGemini(topicId) {
+      const tp = state.topics.find(x => x.id === topicId);
+      if (!tp) return;
+      const c = getCourse(tp.courseId);
+      const promptText = `היי! אני לומד עכשיו באתר שלי לקורס "${c.name}" ועובד על הנושא שאני מתקשה בו: "${tp.title}".\nמה שמקשה עליי במיוחד: ${tp.struggleNotes || 'הבנה עמוקה ופתרון שאלות מבחן'}.\nבוא נעשה שיעור קצר ואינטראקטיבי: תסביר לי את הנושא בצורה אינטואיטיבית ואז תן לי שאלת תרגול אחת כדי לבדוק שהבנתי.`;
+      navigator.clipboard.writeText(promptText).then(() => {
+        alert('📋 הפרומפט הועתק ללוח! עכשיו תוכל להדביק אותו ישירות בצ׳אט איתי (Gemini) ונמשיך ללמוד יחד.');
+      });
+    }
+
+    // --- טיימר פומודורו ---
+    function togglePomodoro() {
+      if (pomodoroRunning) {
+        clearInterval(pomodoroInterval);
+        pomodoroRunning = false;
+      } else {
+        pomodoroRunning = true;
+        pomodoroInterval = setInterval(() => {
+          if (pomodoroSeconds > 0) {
+            pomodoroSeconds--;
+            renderCurrentView();
+          } else {
+            clearInterval(pomodoroInterval);
+            pomodoroRunning = false;
+            alert('🎉 סיימת 25 דקות למידה ממוקדת! קח 5 דקות הפסקה.');
+            pomodoroSeconds = 25 * 60;
+            renderCurrentView();
+          }
+        }, 1000);
+      }
+      renderCurrentView();
+    }
+
+    function resetPomodoro() {
+      clearInterval(pomodoroInterval);
+      pomodoroRunning = false;
+      pomodoroSeconds = 25 * 60;
+      renderCurrentView();
+    }
+
+    // --- מעקב אימונים מלא ---
+    function openWorkoutModal(workoutId = null) {
+      const existing = state.workouts.find(w => w.id === workoutId) || {
+        title: '',
+        category: 'כוח / חדר כושר',
+        date: selectedDate,
+        time: '18:30',
+        durationMin: 60,
+        rpe: 8,
+        completed: false,
+        notes: '',
+        exercises: []
+      };
+      openModal(`
+        <h3 style="margin-bottom:16px;">${workoutId ? '✏️ עריכת אימון' : '💪 שיבוץ / תיעוד אימון חדש'}</h3>
+        <div class="form-group">
+          <label>שם האימון *</label>
+          <input type="text" id="m-wk-title" value="${esc(existing.title)}" placeholder="למשל: אימון כוח A / ריצת 5 ק״מ" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>קטגוריית אימון</label>
+            <select id="m-wk-cat">
+              ${['כוח / חדר כושר', 'ריצה / אירובי', 'משקל גוף / קליסטניקס', 'שחייה / אופניים', 'גמישות / מתיחות'].map(cat => `<option value="${cat}" ${existing.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>סטטוס</label>
+            <select id="m-wk-done">
+              <option value="false" ${!existing.completed ? 'selected' : ''}>מתוכנן בלו"ז היומי</option>
+              <option value="true" ${existing.completed ? 'selected' : ''}>בוצע ✅</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>תאריך האימון *</label>
+            <input type="date" id="m-wk-date" value="${esc(existing.date)}" />
+          </div>
+          <div class="form-group">
+            <label>שעה בלו"ז היומי</label>
+            <input type="time" id="m-wk-time" value="${esc(existing.time || '18:30')}" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>משך האימון (דקות)</label>
+            <input type="number" id="m-wk-dur" value="${esc(existing.durationMin || 60)}" />
+          </div>
+          <div class="form-group">
+            <label>דרגת מאמץ (RPE 1-10)</label>
+            <input type="number" min="1" max="10" id="m-wk-rpe" value="${esc(existing.rpe || 8)}" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>מטרות / הערות לאימון</label>
+          <textarea rows="2" id="m-wk-notes" placeholder="דגשים, זמני מנוחה, קצב יעד...">${esc(existing.notes || '')}</textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn btn-secondary" onclick="closeModal()">ביטול</button>
+          <button class="btn btn-primary" onclick="saveWorkout('${workoutId || ''}')">💾 שמור אימון</button>
+        </div>
+      `);
+    }
+
+    function saveWorkout(workoutId) {
+      const title = document.getElementById('m-wk-title').value.trim();
+      if (!title) return alert('נא להזין את שם האימון');
+      const prev = state.workouts.find(w => w.id === workoutId);
+      const obj = {
+        id: workoutId || uid('w'),
+        title,
+        category: document.getElementById('m-wk-cat').value,
+        completed: document.getElementById('m-wk-done').value === 'true',
+        date: document.getElementById('m-wk-date').value,
+        time: document.getElementById('m-wk-time').value,
+        durationMin: Number(document.getElementById('m-wk-dur').value) || 60,
+        rpe: Number(document.getElementById('m-wk-rpe').value) || 7,
+        notes: document.getElementById('m-wk-notes').value.trim(),
+        exercises: prev ? prev.exercises : []
+      };
+      if (workoutId) {
+        state.workouts = state.workouts.map(w => w.id === workoutId ? obj : w);
+      } else {
+        state.workouts.unshift(obj);
+      }
+      saveState();
+      closeModal();
+      renderCurrentView();
+    }
+
+    function toggleWorkoutDone(workoutId) {
+      const w = state.workouts.find(x => x.id === workoutId);
+      if (!w) return;
+      w.completed = !w.completed;
+      saveState();
+      renderCurrentView();
+    }
+
+    function deleteWorkout(workoutId) {
+      if (!confirm('למחוק את האימון?')) return;
+      state.workouts = state.workouts.filter(w => w.id !== workoutId);
+      saveState();
+      renderCurrentView();
+    }
+
+    function quickAddExercise(workoutId) {
+      const name = document.getElementById(`ex-name-${workoutId}`)?.value.trim();
+      if (!name) return alert('נא להזין שם תרגיל');
+      const sets = document.getElementById(`ex-sets-${workoutId}`)?.value || 3;
+      const reps = document.getElementById(`ex-reps-${workoutId}`)?.value || '10';
+      const weightRaw = document.getElementById(`ex-weight-${workoutId}`)?.value.trim() || '';
+
+      const w = state.workouts.find(x => x.id === workoutId);
+      if (!w) return;
+      w.exercises = w.exercises || [];
+
+      const isRun = w.category.includes('ריצה') || weightRaw.includes('ק"מ');
+      w.exercises.push({
+        name,
+        sets: Number(sets) || 1,
+        reps,
+        weightKg: isRun ? 0 : (parseFloat(weightRaw) || 0),
+        distanceKm: isRun ? weightRaw.replace('ק"מ', '').trim() : '',
+        pr: false
+      });
+
+      saveState();
+      renderCurrentView();
+    }
+
+    function removeExerciseFromWorkout(workoutId, idx) {
+      const w = state.workouts.find(x => x.id === workoutId);
+      if (!w) return;
+      w.exercises.splice(idx, 1);
+      saveState();
+      renderCurrentView();
+    }
+
+    // --- הגדרות כלליות, AI וגיבוי ---
+    function openAiSettingsModal() {
+      openModal(`
+        <h3 style="margin-bottom:14px;">✨ הגדרות סמסטר, Google Drive וחיבור Gemini AI</h3>
+        <div class="form-group">
+          <label>שם הסמסטר / התואר</label>
+          <input type="text" id="m-set-sem" value="${esc(state.settings.semesterName || '')}" />
+        </div>
+        <div class="form-group">
+          <label>קישור לתיקיית Google Drive הראשית של התואר</label>
+          <input type="url" id="m-set-drive" value="${esc(state.settings.driveRootUrl || '')}" placeholder="https://drive.google.com/..." />
+        </div>
+        <div class="form-group">
+          <label>מפתח Gemini API (אופציונלי - לחיבור חי של צ'אט הלמידה ומחולל הפלאשקארדס)</label>
+          <input type="password" id="m-set-key" value="${esc(state.settings.geminiApiKey || '')}" placeholder="AIzaSy..." />
+          <small style="color:var(--text-muted); display:block; margin-top:4px;">
+            ניתן להפיק מפתח חינמי ב-Google AI Studio (aistudio.google.com). המפתח נשמר מקומית בדפדפן שלך בלבד. גם ללא מפתח, חדר הלמידה מייצר כרטיסיות ותבניות שיעור אוטומטית!
+          </small>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button class="btn btn-secondary" onclick="closeModal()">ביטול</button>
+          <button class="btn btn-primary" onclick="saveAiSettings()">💾 שמור הגדרות</button>
+        </div>
+      `);
+    }
+
+    function saveAiSettings() {
+      state.settings.semesterName = document.getElementById('m-set-sem').value.trim() || 'התואר שלי';
+      state.settings.driveRootUrl = document.getElementById('m-set-drive').value.trim();
+      state.settings.geminiApiKey = document.getElementById('m-set-key').value.trim();
+      saveState();
+      closeModal();
+      renderCurrentView();
+    }
+
+    function exportBackup() {
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(state, null, 2));
+      const a = document.createElement('a');
+      a.setAttribute('href', dataStr);
+      a.setAttribute('download', `degreepulse_backup_${getTodayISO()}.json`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function importBackup(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const imported = JSON.parse(evt.target.result);
+          if (imported && Array.isArray(imported.courses)) {
+            state = sanitizeState(imported);
+            saveState();
+            applyTheme();
+            renderCurrentView();
+            alert('✅ הנתונים שוחזרו בהצלחה!');
+          }
+        } catch (err) {
+          alert('שגיאה בקריאת קובץ הגיבוי.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetAllData() {
+      if (!confirm('האם לנקות את כל הנתונים ולהתחיל מדף חלק?')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      state = getInitialData();
+      saveState();
+      renderCurrentView();
+    }
+
+    // אתחול האפליקציה
+    applyTheme();
+    renderCurrentView();
+  </script>
+</body>
+</html>
